@@ -36,7 +36,6 @@ const nextConfig: NextConfig = {
 
   async headers() {
     /* ---------------------- DEV MODE ---------------------- */
-        /* ---------------------- DEV MODE ---------------------- */
     if (isDev) {
       return [
         {
@@ -68,7 +67,10 @@ const nextConfig: NextConfig = {
                 // ✅ รูปภาพ (คงเดิม)
                 "img-src 'self' data: blob: https://res.cloudinary.com https://images.unsplash.com https://*.tiktokcdn.com https://*.tiktokcdn-us.com https://i.ytimg.com https://*.googleusercontent.com https://maps.gstatic.com https://www.gstatic.com https://*.ggpht.com https://maps.googleapis.com",
 
-                "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+                // ⬇️ เพิ่ม accounts.google.com และเพิ่ม style-src-elem (แตะเฉพาะส่วนนี้)
+                "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com",
+                "style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com",
+
                 "font-src 'self' https://fonts.gstatic.com data:",
               ].join("; "),
             },
@@ -93,14 +95,15 @@ const nextConfig: NextConfig = {
       // บราวเซอร์บางตัวใช้ child-src กับ iframe เก่า ๆ
       "child-src 'self' https://www.google.com https://accounts.google.com https://www.google.com/recaptcha/ https://*.tiktok.com https://*.youtube.com",
 
-      // ✅ Network calls
-      "connect-src 'self' https://10topawards.com https://www.google.com https://www.googleapis.com https://maps.googleapis.com https://*.tiktok.com https://*.tiktokcdn.com https://*.tiktokcdn-us.com https://*.youtube.com",
+      // ✅ Network calls (⬇️ เพิ่ม www.10topawards.com เท่านั้น)
+      "connect-src 'self' https://10topawards.com https://www.10topawards.com https://www.google.com https://www.googleapis.com https://maps.googleapis.com https://*.tiktok.com https://*.tiktokcdn.com https://*.tiktokcdn-us.com https://*.youtube.com",
 
       // ✅ Images/Icons (รวม Maps/ggpht)
       "img-src 'self' data: blob: https://res.cloudinary.com https://images.unsplash.com https://*.tiktokcdn.com https://*.tiktokcdn-us.com https://i.ytimg.com https://*.googleusercontent.com https://lh3.googleusercontent.com https://maps.gstatic.com https://www.gstatic.com https://*.ggpht.com https://maps.googleapis.com",
 
-      // ✅ Styles/Fonts
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      // ✅ Styles/Fonts (⬇️ เพิ่ม accounts.google.com และเพิ่ม style-src-elem)
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com",
+      "style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com",
       "font-src 'self' https://fonts.gstatic.com data:",
     ].join("; ");
 
