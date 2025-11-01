@@ -2,6 +2,7 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import Link from "next/link";
+import Script from "next/script"; // ✅ เพิ่ม: ใช้สคริปต์ฝังในหน้าเพื่อ toggle password
 import LoginWithGoogle from "@/components/auth/LoginWithGoogle";
 
 /* ====== ENV / CONST ====== */
@@ -170,6 +171,50 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
 
   return (
     <div className="min-h-[70vh] grid place-items-center bg-[#0F172A] px-4">
+      {/* ✅ สคริปต์ toggle password (ไม่สร้างไฟล์ใหม่) */}
+<Script id="toggle-password-script" strategy="afterInteractive">
+{`
+(function () {
+  // จับคลิกทั้งหน้า แล้วตรวจว่าไปกดปุ่ม toggle หรือไม่
+  function onClick(e) {
+    var target = e.target;
+    if (!target) return;
+
+    // หาให้เจอทั้งกรณีกดโดน svg ภายในปุ่ม
+    var btn = target.closest && target.closest('#pw-toggle');
+    if (!btn) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    // หา input: ใช้ id ถ้ามี, ไม่งั้นหาภายใน container เดียวกัน
+    var input = document.getElementById('password-field')
+             || btn.parentElement && btn.parentElement.querySelector('input[type="password"], input[type="text"]');
+    if (!input) return;
+
+    var isText = input.getAttribute('type') === 'text';
+    input.setAttribute('type', isText ? 'password' : 'text');
+
+    // สลับไอคอน
+    var showIcon = btn.querySelector('[data-eye]');
+    var hideIcon = btn.querySelector('[data-eye-off]');
+    if (showIcon) showIcon.classList.toggle('hidden', !isText);
+    if (hideIcon) hideIcon.classList.toggle('hidden', isText);
+
+    // ARIA
+    btn.setAttribute('aria-pressed', String(!isText));
+    btn.setAttribute('aria-label', isText ? 'แสดงรหัสผ่าน' : 'ซ่อนรหัสผ่าน');
+  }
+
+  // ผูกครั้งเดียวกับ document — ใช้ได้ตลอดทุกการนำทาง
+  if (!window.__pwToggleBound) {
+    document.addEventListener('click', onClick, true);
+    window.__pwToggleBound = true;
+  }
+})();
+`}
+</Script>
+
       <form
         action={login}
         className="w-full max-w-md rounded-2xl bg-[#1A1A1A] p-8 shadow-xl ring-1 ring-[#D4AF37]/20"
@@ -196,16 +241,42 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
         />
 
         <label className="mb-1 block text-sm font-medium text-gray-200">รหัสผ่าน</label>
-        <input
-          name="password"
-          type="password"
-          required
-          autoComplete="current-password"
-          placeholder="••••••••"
-          className="mb-6 w-full rounded-lg border border-[#D4AF37]/30 bg-[#111] px-4 py-2.5 text-sm text-white
-                     placeholder:text-gray-400 shadow-sm focus:border-[#FFD700] focus:outline-none
-                     focus:ring-2 focus:ring-[#FFD700]/40"
-        />
+        {/* ✅ กล่องรหัสผ่าน + ปุ่มแสดง/ซ่อน */}
+        <div className="relative mb-6">
+          <input
+            id="password-field"            /* <- ใช้ในสคริปต์ */
+            name="password"
+            type="password"
+            required
+            autoComplete="current-password"
+            placeholder="••••••••"
+            className="w-full rounded-lg border border-[#D4AF37]/30 bg-[#111] px-4 py-2.5 pr-12
+                       text-sm text-white placeholder:text-gray-400 shadow-sm
+                       focus:border-[#FFD700] focus:outline-none focus:ring-2 focus:ring-[#FFD700]/40"
+          />
+          <button
+  type="button"
+  id="pw-toggle"
+  aria-label="แสดงรหัสผ่าน"
+  aria-pressed="false"
+  title="แสดง/ซ่อนรหัสผ่าน"
+  className="absolute right-3 top-1/2 -translate-y-1/2 z-10
+             p-1.5 rounded-md text-gray-400
+             hover:text-[#FFD700] hover:bg-white/5
+             focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFD700]/40
+             active:scale-95 transition"
+>
+  {/* ตาเปิด */}
+  <svg data-eye xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+    <path strokeWidth="2" d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
+    <circle cx="12" cy="12" r="3" strokeWidth="2" />
+  </svg>
+  {/* ตาปิด (เริ่มซ่อน) */}
+  <svg data-eye-off xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+    <path strokeWidth="2" d="M3 3l18 18M10.58 10.58A3 3 0 0012 15a3 3 0 002.42-4.42M9.88 4.24A10.94 10.94 0 0112 4c6.5 0 10 8 10 8a18.38 18.38 0 01-4.28 5.47M6.11 6.11A18.13 18.13 0 002 12s3.5 7 10 7a10.9 10.9 0 004.24-.88" />
+  </svg>
+</button>
+        </div>
 
         <button className="w-full rounded-lg px-4 py-3 text-sm font-semibold text-black
                            bg-gradient-to-r from-[#FFD700] to-[#B8860B]
