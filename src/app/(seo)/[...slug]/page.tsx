@@ -102,7 +102,8 @@ export default async function SeoPage({
       <Navbar />
 
       {/* JSON-LD จาก API */}
-      <SeoJsonLdFromApi path={seoPath} />
+      {/* <SeoJsonLdFromApi path={seoPath} /> */}
+
 
       <main className="container mx-auto max-w-5xl px-4 md:px-6 py-10 text-white">
         <h1 className="text-2xl font-semibold mb-2">{title}</h1>

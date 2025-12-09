@@ -8,10 +8,6 @@ import BannerCarousel from "./_components/BannerCarousel";
 import VideoStrip from "./_components/VideoStrip";
 import VisitPing from "@/components/VisitPing";
 
-// ✅ เพิ่ม imports สำหรับ SEO ใหม่
-import { buildSeoForPath } from "@/seo/fetchers";
-import SeoJsonLdFromApi from "@/components/SeoJsonLdFromApi";
-
 /** ---------- THEME (premium) ---------- **/
 const THEME = {
   pageBg: "bg-[#0F172A]",
@@ -27,9 +23,6 @@ const THEME = {
     "bg-gradient-to-r from-[#FFD700] to-[#B8860B] hover:from-[#FFCC33] hover:to-[#FFD700] text-black shadow-md",
   chip: "rounded-full bg-white/10 px-3 py-1.5 text-sm text-white hover:bg-white/15 transition",
 };
-
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
 // ✅ ความสูง Navbar
 const NAV_H = "h-16 md:h-20";
@@ -67,94 +60,46 @@ type Video = {
 const API_URL = (
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:8899/api"
 ).replace(/\/$/, "");
-const SITE_URL =
-  (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(
-    /\/$/,
-    ""
-  );
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 const AUTH_COOKIE =
   process.env.AUTH_COOKIE_NAME ||
   process.env.NEXT_PUBLIC_AUTH_COOKIE ||
   "token";
 
-/** ---------- Helpers สำหรับ SEO ---------- */
-function toAbsolute(u: string) {
-  try {
-    return new URL(u, SITE_URL + "/").toString();
-  } catch {
-    return SITE_URL;
-  }
-}
-
-function toKeywordArray(kw?: string | null): string[] | undefined {
-  if (!kw || !kw.trim()) return undefined;
-  return kw
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
-
 /** ---------- Metadata (SEO สำหรับหน้า Home) ---------- **/
 export async function generateMetadata(): Promise<Metadata> {
-  // ใช้ path "/" เป็น key ในระบบ SEO
-  const { site, page } = await buildSeoForPath("/");
-
-  const fallbackTitle = "TopAward | รวมรีวิวยอดนิยม";
-  const fallbackDesc =
-    "รวมรีวิวร้าน/คลินิก/ที่เที่ยว พร้อมรูปภาพและเรตติ้ง จัดหมวดหมู่และค้นหาง่าย";
-
-  const title =
-    (page as any)?.title || (site as any)?.meta_title || fallbackTitle;
-  const description =
-    (page as any)?.description ||
-    (site as any)?.meta_description ||
-    fallbackDesc;
-
-  const ogImages: string[] = Array.from(
-    new Set(
-      [
-        ...((Array.isArray((page as any)?.og_images)
-          ? (page as any).og_images
-          : []) as string[]),
-        ...(((page as any)?.og_image ? [(page as any).og_image] : []) as string[]),
-        ...(((site as any)?.og_image ? [(site as any).og_image] : []) as string[]),
-        "/og-image.jpg", // fallback เผื่อหลังบ้านยังไม่ได้ตั้งค่า
-      ].filter(Boolean) as string[]
-    )
-  ).slice(0, 4);
-
-  const keywordSource =
-    (page as any)?.keywords ?? (site as any)?.keywords ?? undefined;
-
-  const canonical = SITE_URL; // home = root
-
+  const canonical = SITE_URL;
   return {
     metadataBase: new URL(SITE_URL),
-    title,
-    description,
+    title: "TopAward | รวมรีวิวยอดนิยม",
+    description:
+      "รวมรีวิวร้าน/คลินิก/ที่เที่ยว พร้อมรูปภาพและเรตติ้ง จัดหมวดหมู่และค้นหาง่าย",
     alternates: { canonical },
     robots: { index: true, follow: true, maxImagePreview: "large" },
     openGraph: {
       type: "website",
       url: canonical,
       siteName: "TopAward",
-      title,
-      description,
-      images: ogImages.map((url) => ({
-        url: toAbsolute(url),
-        width: 1200,
-        height: 630,
-        alt: title,
-      })),
+      title: "TopAward | รวมรีวิวยอดนิยม",
+      description:
+        "รวมรีวิวร้าน/คลินิก/ที่เที่ยว พร้อมรูปภาพและเรตติ้ง จัดหมวดหมู่และค้นหาง่าย",
+      images: [
+        {
+          url: new URL("/og-image.jpg", SITE_URL).toString(),
+          width: 1200,
+          height: 630,
+          alt: "TopAward",
+        },
+      ],
       locale: "th_TH",
     },
     twitter: {
       card: "summary_large_image",
-      title,
-      description,
-      images: [toAbsolute(ogImages[0] || "/og-image.jpg")],
+      title: "TopAward | รวมรีวิวยอดนิยม",
+      description:
+        "รวมรีวิวร้าน/คลินิก/ที่เที่ยว พร้อมรูปภาพและเรตติ้ง จัดหมวดหมู่และค้นหาง่าย",
+      images: [new URL("/og-image.jpg", SITE_URL).toString()],
     },
-    keywords: toKeywordArray(keywordSource),
   };
 }
 
@@ -378,7 +323,6 @@ export default async function HomePage() {
     )
     .slice(0, 4);
 
-  // JSON-LD เดิมของหน้า Home (ยังเก็บไว้ใช้ได้)
   const ldWebSite = {
     "@context": "https://schema.org",
     "@type": "WebSite",
@@ -413,10 +357,6 @@ export default async function HomePage() {
 
   return (
     <>
-      {/* ✅ JSON-LD จาก API (หลังบ้าน) สำหรับ path = "/" */}
-      <SeoJsonLdFromApi path="/" />
-
-      {/* JSON-LD เดิมที่ฝังหน้า Home (ถ้าไม่อยากซ้ำมาก สามารถค่อย ๆ ย้ายเข้า backend ภายหลังได้) */}
       <script
         id="ld-website"
         type="application/ld+json"
@@ -462,7 +402,11 @@ export default async function HomePage() {
               <span className={THEME.accent}>แนะนำสำหรับคุณ</span>
             </h1>
           </div>
-          <BannerCarousel banners={banners} cardWidth={560} speedSec={50} />
+          <BannerCarousel
+            banners={banners}
+            cardWidth={560}
+            speedSec={50}
+          />
         </section>
 
         {/* VIDEOS */}
