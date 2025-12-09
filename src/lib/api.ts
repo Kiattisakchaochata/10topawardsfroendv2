@@ -5,7 +5,7 @@ function computeBase() {
   const raw =
     process.env.NEXT_PUBLIC_API_BASE ??
     process.env.NEXT_PUBLIC_API_URL ??
-    'http://localhost:8877';
+    'http://localhost:8899';
 
   let base = raw.replace(/\/$/, '');
   if (!/\/api$/.test(base)) base += '/api';

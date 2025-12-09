@@ -1,10 +1,12 @@
 {
+  "id": "/?source=pwa",
   "name": "TopAward",
   "short_name": "TopAward",
   "description": "รวมรีวิวร้าน/คลินิก/ที่เที่ยว พร้อมรูปภาพและเรตติ้ง จัดหมวดหมู่และค้นหาง่าย",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone", "browser"],
   "orientation": "portrait",
   "background_color": "#0f172a",
   "theme_color": "#0f172a",
@@ -15,9 +17,16 @@
       "type": "image/png"
     },
     {
-      "src": "/icon-512.png",
+      "src": "/android-chrome-512x512.png",
       "sizes": "512x512",
       "type": "image/png"
+    },
+    {
+      "src": "/android-chrome-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
     }
-  ]
+  ],
+  "prefer_related_applications": false
 }

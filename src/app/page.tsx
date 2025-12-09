@@ -1,13 +1,17 @@
-//src/page.tsx
+// src/app/page.tsx
 import React from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { cookies } from "next/headers";
-import { safeUrl } from "@/lib/safeUrl";
 import Navbar from "@/components/Navbar";
 import BannerCarousel from "./_components/BannerCarousel";
 import VideoStrip from "./_components/VideoStrip";
 import VisitPing from "@/components/VisitPing";
+
+// ✅ เพิ่ม imports สำหรับ SEO ใหม่
+import { buildSeoForPath } from "@/seo/fetchers";
+import SeoJsonLdFromApi from "@/components/SeoJsonLdFromApi";
+
 /** ---------- THEME (premium) ---------- **/
 const THEME = {
   pageBg: "bg-[#0F172A]",
@@ -23,6 +27,9 @@ const THEME = {
     "bg-gradient-to-r from-[#FFD700] to-[#B8860B] hover:from-[#FFCC33] hover:to-[#FFD700] text-black shadow-md",
   chip: "rounded-full bg-white/10 px-3 py-1.5 text-sm text-white hover:bg-white/15 transition",
 };
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 // ✅ ความสูง Navbar
 const NAV_H = "h-16 md:h-20";
@@ -60,57 +67,108 @@ type Video = {
 const API_URL = (
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:8899/api"
 ).replace(/\/$/, "");
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+const SITE_URL =
+  (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(
+    /\/$/,
+    ""
+  );
 const AUTH_COOKIE =
   process.env.AUTH_COOKIE_NAME ||
   process.env.NEXT_PUBLIC_AUTH_COOKIE ||
   "token";
 
+/** ---------- Helpers สำหรับ SEO ---------- */
+function toAbsolute(u: string) {
+  try {
+    return new URL(u, SITE_URL + "/").toString();
+  } catch {
+    return SITE_URL;
+  }
+}
+
+function toKeywordArray(kw?: string | null): string[] | undefined {
+  if (!kw || !kw.trim()) return undefined;
+  return kw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
 
 /** ---------- Metadata (SEO สำหรับหน้า Home) ---------- **/
 export async function generateMetadata(): Promise<Metadata> {
-  const canonical = SITE_URL;
+  // ใช้ path "/" เป็น key ในระบบ SEO
+  const { site, page } = await buildSeoForPath("/");
+
+  const fallbackTitle = "TopAward | รวมรีวิวยอดนิยม";
+  const fallbackDesc =
+    "รวมรีวิวร้าน/คลินิก/ที่เที่ยว พร้อมรูปภาพและเรตติ้ง จัดหมวดหมู่และค้นหาง่าย";
+
+  const title =
+    (page as any)?.title || (site as any)?.meta_title || fallbackTitle;
+  const description =
+    (page as any)?.description ||
+    (site as any)?.meta_description ||
+    fallbackDesc;
+
+  const ogImages: string[] = Array.from(
+    new Set(
+      [
+        ...((Array.isArray((page as any)?.og_images)
+          ? (page as any).og_images
+          : []) as string[]),
+        ...(((page as any)?.og_image ? [(page as any).og_image] : []) as string[]),
+        ...(((site as any)?.og_image ? [(site as any).og_image] : []) as string[]),
+        "/og-image.jpg", // fallback เผื่อหลังบ้านยังไม่ได้ตั้งค่า
+      ].filter(Boolean) as string[]
+    )
+  ).slice(0, 4);
+
+  const keywordSource =
+    (page as any)?.keywords ?? (site as any)?.keywords ?? undefined;
+
+  const canonical = SITE_URL; // home = root
+
   return {
     metadataBase: new URL(SITE_URL),
-    title: "TopAward | รวมรีวิวยอดนิยม",
-    description:
-      "รวมรีวิวร้าน/คลินิก/ที่เที่ยว พร้อมรูปภาพและเรตติ้ง จัดหมวดหมู่และค้นหาง่าย",
+    title,
+    description,
     alternates: { canonical },
     robots: { index: true, follow: true, maxImagePreview: "large" },
     openGraph: {
       type: "website",
       url: canonical,
       siteName: "TopAward",
-      title: "TopAward | รวมรีวิวยอดนิยม",
-      description:
-        "รวมรีวิวร้าน/คลินิก/ที่เที่ยว พร้อมรูปภาพและเรตติ้ง จัดหมวดหมู่และค้นหาง่าย",
-      images: [
-        {
-          url: new URL("/og-image.jpg", SITE_URL).toString(), // ทำให้เป็น absolute
-          width: 1200,
-          height: 630,
-          alt: "TopAward",
-        },
-      ],
+      title,
+      description,
+      images: ogImages.map((url) => ({
+        url: toAbsolute(url),
+        width: 1200,
+        height: 630,
+        alt: title,
+      })),
       locale: "th_TH",
     },
     twitter: {
       card: "summary_large_image",
-      title: "TopAward | รวมรีวิวยอดนิยม",
-      description:
-        "รวมรีวิวร้าน/คลินิก/ที่เที่ยว พร้อมรูปภาพและเรตติ้ง จัดหมวดหมู่และค้นหาง่าย",
-      images: [new URL("/og-image.jpg", SITE_URL).toString()],
+      title,
+      description,
+      images: [toAbsolute(ogImages[0] || "/og-image.jpg")],
     },
+    keywords: toKeywordArray(keywordSource),
   };
 }
 
 /** ---------- Fetch helpers ---------- **/
 async function getCategories(): Promise<Category[]> {
   try {
-    const res = await fetch(`${API_URL}/categories`, { next: { revalidate: 300 } });
+    const res = await fetch(`${API_URL}/categories`, {
+      next: { revalidate: 300 },
+    });
     if (!res.ok) return [];
     const data = await res.json();
-    const list: Category[] = Array.isArray(data) ? data : data?.categories || [];
+    const list: Category[] = Array.isArray(data)
+      ? data
+      : data?.categories || [];
     return list.filter((c) => c?.id);
   } catch {
     return [];
@@ -119,7 +177,9 @@ async function getCategories(): Promise<Category[]> {
 
 async function getStores(): Promise<Store[]> {
   try {
-    const res = await fetch(`${API_URL}/stores`, { next: { revalidate: 300 } });
+    const res = await fetch(`${API_URL}/stores`, {
+      next: { revalidate: 300 },
+    });
     if (!res.ok) return [];
     const data = await res.json();
     const list: Store[] = data?.stores || data || [];
@@ -130,25 +190,36 @@ async function getStores(): Promise<Store[]> {
 }
 
 /** ✅ ดึงรีวิวของร้านแล้วคำนวณ avg,count แบบสด */
-async function getReviewStats(storeId: string): Promise<{ avg?: number; count: number }> {
+async function getReviewStats(
+  storeId: string
+): Promise<{ avg?: number; count: number }> {
   try {
     const r = await fetch(
       `${API_URL}/reviews/stores/${encodeURIComponent(storeId)}/reviews`,
-      { cache: "no-store", next: { revalidate: 0 }, headers: { "Cache-Control": "no-store" } }
+      {
+        cache: "no-store",
+        next: { revalidate: 0 },
+        headers: { "Cache-Control": "no-store" },
+      }
     );
     const j = await r.json().catch(() => ({}));
     const reviews: Array<{ rating?: number }> =
       (Array.isArray(j?.reviews) && j.reviews) || (Array.isArray(j) && j) || [];
-    const nums = reviews.map((x) => Number(x?.rating || 0)).filter((n) => Number.isFinite(n) && n > 0);
+    const nums = reviews
+      .map((x) => Number(x?.rating || 0))
+      .filter((n) => Number.isFinite(n) && n > 0);
     const count = nums.length;
-    const avg = count ? Number((nums.reduce((a, b) => a + b, 0) / count).toFixed(1)) : undefined;
+    const avg = count
+      ? Number(
+          (nums.reduce((a, b) => a + b, 0) / count).toFixed(1)
+        )
+      : undefined;
     return { avg, count };
   } catch {
     return { avg: undefined, count: 0 };
   }
 }
 
-// แทนที่ฟังก์ชัน getPopularStores ทั้งก้อนด้วยเวอร์ชัน "เข้มงวด"
 async function getPopularStores(limit = 12): Promise<Store[]> {
   const reqLimit = Math.max(limit * 3, limit);
 
@@ -197,10 +268,15 @@ async function getPopularStores(limit = 12): Promise<Store[]> {
   const enriched = await Promise.all(
     base.map(async (s) => {
       const stats = await getReviewStats(s.id);
-      const liveAvg = typeof stats.avg === "number" ? stats.avg : Number(s.avg_rating ?? 0);
-      return { ...s, avg_rating: liveAvg, _reviewCount: stats.count || 0 } as Store & {
-        _reviewCount: number;
-      };
+      const liveAvg =
+        typeof stats.avg === "number"
+          ? stats.avg
+          : Number(s.avg_rating ?? 0);
+      return {
+        ...s,
+        avg_rating: liveAvg,
+        _reviewCount: stats.count || 0,
+      } as Store & { _reviewCount: number };
     })
   );
 
@@ -211,11 +287,13 @@ async function getPopularStores(limit = 12): Promise<Store[]> {
         Number(s.avg_rating ?? 0) >= 4.0 &&
         Number((s as any)._reviewCount ?? 0) > 0
     )
-    .sort((a, b) => Number(b.avg_rating ?? 0) - Number(a.avg_rating ?? 0))
+    .sort(
+      (a, b) => Number(b.avg_rating ?? 0) - Number(a.avg_rating ?? 0)
+    )
     .slice(0, limit);
 }
 
-/** ⬇️ เปลี่ยนไปใช้ public endpoint เพื่อดึงเฉพาะ active (สดทันที) */
+/** ⬇️ ดึงเฉพาะ active banners */
 async function getBanners(): Promise<Banner[]> {
   try {
     const res = await fetch(`${API_URL}/banners`, {
@@ -234,45 +312,41 @@ async function getBanners(): Promise<Banner[]> {
   }
 }
 
-// ===== ปรับฟังก์ชัน getVideos
 async function getVideos(take = 12): Promise<Video[]> {
   try {
-    const res = await fetch(`${SITE_URL}/api/videos?active=1&take=${take}`, {
-      cache: "no-store",
-      next: { revalidate: 0, tags: ["videos"] },
-      headers: { "Cache-Control": "no-store" },
-    });
+    const res = await fetch(
+      `${SITE_URL}/api/videos?active=1&take=${take}`,
+      {
+        cache: "no-store",
+        next: { revalidate: 0, tags: ["videos"] },
+        headers: { "Cache-Control": "no-store" },
+      }
+    );
     if (!res.ok) return [];
     const data = await res.json();
     const list: any[] = Array.isArray(data) ? data : data?.videos || [];
 
-    // ✅ ต้องมีอย่างน้อย YouTube หรือ TikTok อย่างใดอย่างหนึ่ง
-    return (list || []).filter((v) => v?.id && (v.youtube_url || v.tiktok_url));
+    return (list || []).filter(
+      (v) => v?.id && (v.youtube_url || v.tiktok_url)
+    );
   } catch {
     return [];
   }
 }
 
 /** ---------- Utils ---------- **/
-// เปลี่ยนฟังก์ชัน 2 ตัวนี้ให้ sanitize ภายในเลย
-
 const firstImage = (s: Store) =>
-  safeUrl(
-    s.cover_image ||
-      s.images?.[0]?.image_url ||
-      "https://images.unsplash.com/photo-1526318472351-c75fcf070305?q=80&w=1200&auto=format&fit=crop"
-  );
+  s.cover_image ||
+  s.images?.[0]?.image_url ||
+  "https://images.unsplash.com/photo-1526318472351-c75fcf070305?q=80&w=1200&auto=format&fit=crop";
 
 const catImage = (c: Category) =>
-  safeUrl(
-    c.cover_image ||
-      "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?q=80&w=1200&auto=format&fit=crop"
-  );
+  c.cover_image ||
+  "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?q=80&w=1200&auto=format&fit=crop";
 
 const fmtTH = (iso?: string) =>
   iso ? new Date(iso).toLocaleDateString("th-TH") : "-";
 
-// ✅ กัน XSS + จัดฟอร์แมตให้อ่านง่ายใน view-source
 const jsonSafe = (o: any, space: number = 2) =>
   JSON.stringify(o, null, space)
     .replace(/</g, "\\u003c")
@@ -280,29 +354,22 @@ const jsonSafe = (o: any, space: number = 2) =>
 
 /** ---------- Page ---------- **/
 export default async function HomePage() {
-  const [categories, storesAll, banners, popular, videos] = await Promise.all([
-  getCategories(),
-  getStores(),
-  getBanners(),
-  getPopularStores(12),
-  getVideos(12),
-]);
-  console.log('[home] videos:', videos.map(v => ({ id: v.id, yt: !!v.youtube_url, tk: !!v.tiktok_url })));
-
-  // ✅ เพิ่ม log ตรงนี้
-  console.log(
-    "videos:",
-    videos.map((v) => ({
-      id: v.id,
-      yt: !!v.youtube_url,
-      tk: !!v.tiktok_url,
-    }))
+  const [categories, storesAll, banners, popular, videos] = await Promise.all(
+    [
+      getCategories(),
+      getStores(),
+      getBanners(),
+      getPopularStores(12),
+      getVideos(12),
+    ]
   );
 
   const jar = await cookies();
   const loggedIn = Boolean(jar.get(AUTH_COOKIE)?.value);
 
-  const activeStores = (storesAll || []).filter((s) => s.is_active !== false && s.id);
+  const activeStores = (storesAll || []).filter(
+    (s) => s.is_active !== false && s.id
+  );
   const latestStores = [...activeStores]
     .sort(
       (a, b) =>
@@ -311,7 +378,7 @@ export default async function HomePage() {
     )
     .slice(0, 4);
 
-  /** ---------- JSON-LD ---------- **/
+  // JSON-LD เดิมของหน้า Home (ยังเก็บไว้ใช้ได้)
   const ldWebSite = {
     "@context": "https://schema.org",
     "@type": "WebSite",
@@ -325,52 +392,62 @@ export default async function HomePage() {
   };
 
   const ldLatestStores =
-  latestStores.length > 0
-    ? {
-        "@context": "https://schema.org",
-        "@type": "ItemList",
-        name: "ร้านล่าสุด",
-        itemListElement: latestStores.map((s, idx) => ({
-          "@type": "ListItem",
-          position: idx + 1,
-          url: `${SITE_URL}/store/${s.id}`,
-          item: {
-            "@type": "LocalBusiness",
-            name: s.name,
-            description: s.description || undefined,
-            image: firstImage(s), // <- sanitized แล้ว
-          },
-        })),
-      }
-    : null;
+    latestStores.length > 0
+      ? {
+          "@context": "https://schema.org",
+          "@type": "ItemList",
+          name: "ร้านล่าสุด",
+          itemListElement: latestStores.map((s, idx) => ({
+            "@type": "ListItem",
+            position: idx + 1,
+            url: `${SITE_URL}/store/${s.id}`,
+            item: {
+              "@type": "LocalBusiness",
+              name: s.name,
+              description: s.description || undefined,
+              image: firstImage(s),
+            },
+          })),
+        }
+      : null;
 
-    return (
+  return (
     <>
-<script
-  id="ld-website"
-  type="application/ld+json"
-  dangerouslySetInnerHTML={{ __html: jsonSafe(ldWebSite, 2) }}
-/>
+      {/* ✅ JSON-LD จาก API (หลังบ้าน) สำหรับ path = "/" */}
+      <SeoJsonLdFromApi path="/" />
 
-{ldLatestStores && (
-  <script
-    id="ld-latest-stores"
-    type="application/ld+json"
-    dangerouslySetInnerHTML={{ __html: jsonSafe(ldLatestStores, 2) }}
-  />
-)}
-      <div className={`${THEME.pageBg} min-h-screen ${THEME.textMain} relative`}>
-        {/* ✅ นับยอดเข้าหน้าเว็บรวม */}
+      {/* JSON-LD เดิมที่ฝังหน้า Home (ถ้าไม่อยากซ้ำมาก สามารถค่อย ๆ ย้ายเข้า backend ภายหลังได้) */}
+      <script
+        id="ld-website"
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: jsonSafe(ldWebSite, 2) }}
+      />
+
+      {ldLatestStores && (
+        <script
+          id="ld-latest-stores"
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: jsonSafe(ldLatestStores, 2),
+          }}
+        />
+      )}
+
+      <div
+        className={`${THEME.pageBg} min-h-screen ${THEME.textMain} relative`}
+      >
         <VisitPing kind="website" />
 
-        {/* premium bg light blobs */}
         <div
           className="pointer-events-none absolute inset-0 opacity-70"
           style={{ backgroundImage: `radial-gradient(${THEME.pageBgFx})` }}
           aria-hidden
         />
-        {/* ===== NAVBAR ===== */}
-        <header className={`fixed inset-x-0 top-0 z-50 ${NAV_H} border-b border-[#2A2A2A]`}>
+
+        {/* NAVBAR */}
+        <header
+          className={`fixed inset-x-0 top-0 z-50 ${NAV_H} border-b border-[#2A2A2A]`}
+        >
           <div className="absolute inset-0 bg-[#1C1C1C]/95 backdrop-blur supports-[backdrop-filter]:bg-[#1C1C1C]/95" />
           <div className="relative h-full w-full px-3 sm:px-4 lg:px-6">
             <Navbar loggedIn={loggedIn} />
@@ -378,7 +455,7 @@ export default async function HomePage() {
         </header>
         <div className={NAV_H} />
 
-        {/* ===== HERO BANNERS ===== */}
+        {/* HERO BANNERS */}
         <section className="relative mx-auto max-w-7xl px-4 pt-6 lg:max-w-8xl lg:px-6 lg:pt-8">
           <div className="mb-4 flex items-end justify-between">
             <h1 className="text-2xl font-extrabold lg:text-3xl">
@@ -388,26 +465,31 @@ export default async function HomePage() {
           <BannerCarousel banners={banners} cardWidth={560} speedSec={50} />
         </section>
 
-        {/* ===== VIDEOS ===== */}
+        {/* VIDEOS */}
         {videos.length > 0 && (
           <section className="relative mx-auto max-w-7xl px-4 pt-3 lg:max-w-8xl lg:px-6">
             <VideoStrip videos={videos} />
           </section>
         )}
 
-        {/* ===== CATEGORIES ===== */}
+        {/* CATEGORIES */}
         <section className="relative mx-auto max-w-7xl px-4 py-10 lg:max-w-8xl lg:px-6 lg:py-14">
-          <div className="mb-6 flex items-center justify-between lg:mb-8">
+          <div className="mb-6 flex items-center justify_between lg:mb-8">
             <h2 className="text-2xl font-extrabold lg:text-3xl">
               หมวดหมู่ <span className={THEME.accent}>ยอดนิยม</span>
             </h2>
-            <Link href="/category" className="text-sm lg:text-base hover:underline">
+            <Link
+              href="/category"
+              className="text-sm lg:text-base hover:underline"
+            >
               <span className={THEME.accent}>ดูทั้งหมด</span>
             </Link>
           </div>
 
           {categories.length === 0 ? (
-            <div className={`${THEME.textMuted} text-sm lg:text-base`}>ยังไม่มีหมวดหมู่</div>
+            <div className={`${THEME.textMuted} text-sm lg:text-base`}>
+              ยังไม่มีหมวดหมู่
+            </div>
           ) : (
             <div className="grid grid-cols-2 gap-4 md:grid-cols-3 md:gap-6 lg:grid-cols-4">
               {categories.map((cat) => (
@@ -425,7 +507,9 @@ export default async function HomePage() {
                     />
                   </div>
                   <div className="p-4">
-                    <h3 className="line-clamp-1 font-bold text-white">{cat.name}</h3>
+                    <h3 className="line-clamp-1 font-bold text-white">
+                      {cat.name}
+                    </h3>
                   </div>
                 </Link>
               ))}
@@ -433,19 +517,24 @@ export default async function HomePage() {
           )}
         </section>
 
-        {/* ===== POPULAR (HORIZONTAL) ===== */}
+        {/* POPULAR */}
         <section className="relative mx-auto max-w-7xl px-4 lg:max-w-8xl lg:px-6">
           <div className="mb-4 flex items-center justify-between lg:mb-6">
             <h2 className="text-2xl font-extrabold lg:text-3xl">
               รีวิว <span className={THEME.accent}>ยอดนิยม</span>
             </h2>
-            <Link href="/store?popular=1" className="text-sm lg:text-base hover:underline">
+            <Link
+              href="/store?popular=1"
+              className="text-sm lg:text-base hover:underline"
+            >
               <span className={THEME.accent}>ดูทั้งหมด</span>
             </Link>
           </div>
 
           {popular.length === 0 ? (
-            <div className={`${THEME.textMuted} text-sm lg:text-base`}>ยังไม่มีข้อมูล</div>
+            <div className={`${THEME.textMuted} text-sm lg:text-base`}>
+              ยังไม่มีข้อมูล
+            </div>
           ) : (
             <div className="no-scrollbar -mx-2 flex snap-x gap-4 overflow-x-auto px-2 pb-2 lg:gap-6 lg:pb-4">
               {popular.map((s) => (
@@ -463,7 +552,9 @@ export default async function HomePage() {
                     />
                   </div>
                   <div className="p-4">
-                    <div className="mb-1 line-clamp-1 font-bold text-white">{s.name}</div>
+                    <div className="mb-1 line-clamp-1 font-bold text_white">
+                      {s.name}
+                    </div>
                     <div className="flex items-center gap-2 text-sm text-white/90">
                       <span className="bg-gradient-to-r from-[#FFD700] to-[#B8860B] bg-clip-text text-lg font-bold text-transparent">
                         ★
@@ -472,7 +563,9 @@ export default async function HomePage() {
                         {(s.avg_rating ?? 0).toFixed(1)}
                       </span>
                       <span className="opacity-70">•</span>
-                      <span>{(s._reviewCount ?? 0).toLocaleString("th-TH")} รีวิว</span>
+                      <span>
+                        {(s._reviewCount ?? 0).toLocaleString("th-TH")} รีวิว
+                      </span>
                     </div>
                   </div>
                 </Link>
@@ -481,7 +574,7 @@ export default async function HomePage() {
           )}
         </section>
 
-        {/* ===== LATEST STORES ===== */}
+        {/* LATEST STORES */}
         <section className="relative mx-auto max-w-7xl px-4 pb-16 pt-10 lg:max-w-8xl lg:px-6 lg:pt-14">
           <div className="mb-4 flex items-center justify-between lg:mb-6">
             <h2 className="text-2xl font-extrabold lg:text-3xl">
@@ -490,7 +583,9 @@ export default async function HomePage() {
           </div>
 
           {latestStores.length === 0 ? (
-            <div className={`${THEME.textMuted} text-sm lg:text-base`}>ยังไม่มีร้าน</div>
+            <div className={`${THEME.textMuted} text-sm lg:text-base`}>
+              ยังไม่มีร้าน
+            </div>
           ) : (
             <div className="grid grid-cols-1 gap-4 md:gap-6 lg:grid-cols-2">
               {latestStores.map((store) => (

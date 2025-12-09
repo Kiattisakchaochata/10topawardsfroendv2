@@ -1,38 +1,82 @@
 // src/app/api/proxy/image/route.ts
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
-export const runtime = "edge"; // หรือ "nodejs" ก็ได้
+// src/app/api/proxy/image/route.ts
+
+// จะใช้ "edge" หรือ "nodejs" ก็ได้ แล้วแต่โปรเจกต์ / hosting
+export const runtime = "edge";
+
+// จำกัด host ที่อนุญาต ไม่ให้กลายเป็น open proxy
+const ALLOWED_HOSTS = [
+  // TikTok CDN หลัก ๆ
+  "p16-common-sign.tiktokcdn-us.com",
+  "p19-common-sign.tiktokcdn-us.com",
+  "p16-sign.tiktokcdn.com",
+  "p16-sign-va.tiktokcdn.com",
+  "p16-sign-sg.tiktokcdn.com", // จาก log เดิม
+  // YouTube thumbnail
+  "img.youtube.com",
+  "i.ytimg.com",
+];
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const u = searchParams.get("u");
-  if (!u) return new NextResponse("Missing u", { status: 400 });
+  if (!u) {
+    return new Response("Missing u", { status: 400 });
+  }
 
+  let target: URL;
   try {
-    const target = new URL(u);
+    target = new URL(u);
     if (!/^https?:$/.test(target.protocol)) {
-      return new NextResponse("Bad URL", { status: 400 });
+      return new Response("Bad URL", { status: 400 });
     }
   } catch {
-    return new NextResponse("Bad URL", { status: 400 });
+    return new Response("Bad URL", { status: 400 });
   }
 
-  const upstream = await fetch(u, {
-    headers: { Referer: "https://www.tiktok.com/" },
-  });
-
-  if (!upstream.ok) {
-    return new NextResponse(`Upstream ${upstream.status}`, { status: 502 });
+  // อนุญาตเฉพาะ host ที่เราระบุไว้
+  const allowed = ALLOWED_HOSTS.some(
+    (h) => target.hostname === h || target.hostname.endsWith(`.${h}`)
+  );
+  if (!allowed) {
+    return new Response("Host not allowed", { status: 400 });
   }
 
-  const body = await upstream.arrayBuffer();
-  const ct = upstream.headers.get("content-type") || "image/jpeg";
+  try {
+    const isTikTokCdn = target.hostname.includes("tiktokcdn");
 
-  return new NextResponse(body, {
-    headers: {
-      "content-type": ct,
-      "cache-control": "public, max-age=3600",
-      "x-proxied-from": new URL(u).hostname,
-    },
-  });
+    const upstream = await fetch(target.toString(), {
+      headers: isTikTokCdn ? { Referer: "https://www.tiktok.com/" } : undefined,
+      redirect: "follow",
+    });
+
+    if (!upstream.ok) {
+      console.error(
+        "[image-proxy] upstream error",
+        upstream.status,
+        target.toString()
+      );
+      // ส่ง status จริงกลับไปเลย (404 ก็ 404, 403 ก็ 403)
+      return new Response(`Upstream ${upstream.status}`, {
+        status: upstream.status,
+      });
+    }
+
+    const contentType = upstream.headers.get("content-type") ?? "image/jpeg";
+
+    // stream body ตรง ๆ
+    return new Response(upstream.body, {
+      status: 200,
+      headers: {
+        "content-type": contentType,
+        "cache-control": "public, max-age=3600",
+        "x-proxied-from": target.hostname,
+      },
+    });
+  } catch (err) {
+    console.error("[image-proxy] exception", err);
+    return new Response("Proxy error", { status: 500 });
+  }
 }

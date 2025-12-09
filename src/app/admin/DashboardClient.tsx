@@ -1,4 +1,4 @@
-// src/app/admin/stores/DashboardClient.tsx
+// src/app/admin/DashboardClient.tsx
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
@@ -28,6 +28,13 @@ function addMonths(iso?: string | null, months = 0) {
   nd.setMonth(nd.getMonth() + months);
   return nd.toISOString();
 }
+type FeedbackRow = {
+  store_id: string;
+  store_name: string;
+  avg_food: number;
+  avg_service: number;
+  total_feedback: number;
+};
 
 function displayStoreName(s: Store) {
   return (s.name && s.name.trim()) || "(ไม่ระบุชื่อ)";
@@ -135,12 +142,15 @@ export default function DashboardClient({
   visitorsByStore = [],
   stores = [],
   expiredFallback = [],
+  feedbackSummary = [],
 }: {
   summary: Summary;
   visitorsByStore?: VisitorByStore[];
   stores?: Store[];
   expiredFallback?: [string, string][];
+  feedbackSummary?: FeedbackRow[];
 }) {
+  console.log("DashboardClient feedbackSummary =", feedbackSummary);
   // ====== ของเดิม ======
   const [data, setData] = useState<Store[]>(stores || []);
   const [fallback, setFallback] = useState<Map<string, string>>(
@@ -491,6 +501,43 @@ setLiveVisitorsTotal(total);
 </tbody>
         </DataTable>
       </SectionBox>
+
+      {/* รายงานการให้คะแนนของแต่ละร้าน */}
+      <SectionBox title="รายงานการให้คะแนนของแต่ละร้าน">
+        <DataTable className="min-w-[760px]">
+          <thead>
+            <tr>
+              <Th>ชื่อร้าน</Th>
+              <Th className="text-right">เฉลี่ยรสชาติอาหาร</Th>
+              <Th className="text-right">เฉลี่ยการบริการ</Th>
+              <Th className="text-right">จำนวนครั้งที่ให้คะแนน</Th>
+            </tr>
+          </thead>
+          <tbody>
+            {(!feedbackSummary || feedbackSummary.length === 0) ? (
+              <NoRow colSpan={4} text="ยังไม่มีข้อมูลการให้คะแนน" />
+            ) : (
+              feedbackSummary.map((f) => (
+                <tr key={f.store_id} className="border-t hover:bg-slate-50/60">
+                  <Td className="text-slate-900">
+                    {f.store_name || "(ไม่ระบุชื่อ)"}
+                  </Td>
+                  <Td className="text-right">
+                    {f.avg_food.toFixed(1)} / 5
+                  </Td>
+                  <Td className="text-right">
+                    {f.avg_service.toFixed(1)} / 5
+                  </Td>
+                  <Td className="text-right">
+                    {f.total_feedback}
+                  </Td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </DataTable>
+      </SectionBox>
+      
 
       {/* ===== Modal ===== */}
       <RenewModal

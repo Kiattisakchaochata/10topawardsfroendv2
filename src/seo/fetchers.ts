@@ -6,7 +6,7 @@ function getApiBase() {
   const raw =
     process.env.NEXT_PUBLIC_API_BASE ||
     process.env.NEXT_PUBLIC_API_URL ||
-    'http://localhost:8877';
+    'http://localhost:8899';
   const base = raw.replace(/\/$/, '');
   return /\/api$/.test(base) ? base : `${base}/api`;
 }

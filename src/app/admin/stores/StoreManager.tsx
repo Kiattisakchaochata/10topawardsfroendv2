@@ -4,6 +4,7 @@
 import { useMemo, useRef, useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { normalizeGoogleEmbed, extractIframeSrc } from "@/lib/googleMap";
+import Link from "next/link";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8899/api";
 
@@ -884,6 +885,12 @@ fd.append("social_links", JSON.stringify(soc));
                 >
                   แก้ไข
                 </button>
+                <Link
+  href={`/admin/stores/${s.id}/qr`}
+  className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 font-semibold shadow flex items-center justify-center"
+>
+  QR
+</Link>
                 <button
                   onClick={()=>setDeleteStoreId(s.id)}
                   className="rounded-xl bg-gradient-to-r from-pink-500 to-pink-600 hover:from-pink-600 hover:to-pink-700 text-white px-4 py-2 font-semibold shadow"

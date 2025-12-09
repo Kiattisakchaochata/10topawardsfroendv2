@@ -7,7 +7,10 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
 
   images: {
+    formats: ["image/avif", "image/webp"],
     remotePatterns: [
+      { protocol: "https", hostname: "10topawards.com" },
+      { protocol: "https", hostname: "www.10topawards.com" },
       { protocol: "https", hostname: "res.cloudinary.com" },
       { protocol: "https", hostname: "images.unsplash.com" },
 
@@ -19,9 +22,9 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "lh3.googleusercontent.com" },
       { protocol: "https", hostname: "maps.gstatic.com" },
       { protocol: "https", hostname: "www.gstatic.com" },
-      // แผนที่มักโหลด tiles/รูปจาก ggpht และ googleapis ด้วย
       { protocol: "https", hostname: "**.ggpht.com" },
       { protocol: "https", hostname: "maps.googleapis.com" },
+      { protocol: "https", hostname: "**.ttwstatic.com" },
     ],
   },
 
@@ -50,26 +53,27 @@ const nextConfig: NextConfig = {
                 "object-src 'none'",
                 "worker-src 'self' blob:",
 
-                // ✅ เพิ่ม GSI + reCAPTCHA สำหรับ DEV
-                "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com https://www.google.com https://www.gstatic.com https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/ https://maps.googleapis.com https://www.tiktok.com https://www.youtube.com",
+                // ✅ DEV: scripts (Google + TikTok + Facebook + GTM)
+                "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com https://www.google.com https://www.gstatic.com https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/ https://maps.googleapis.com https://www.tiktok.com https://www.youtube.com https://*.ttwstatic.com https://connect.facebook.net https://www.facebook.com https://www.googletagmanager.com",
 
-                "script-src-elem 'self' 'unsafe-inline' https://accounts.google.com https://www.google.com https://www.gstatic.com https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/ https://maps.googleapis.com https://www.tiktok.com https://www.youtube.com",
+                // ✅ DEV: script elements
+                "script-src-elem 'self' 'unsafe-inline' https://accounts.google.com https://www.google.com https://www.gstatic.com https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/ https://maps.googleapis.com https://www.tiktok.com https://www.youtube.com https://*.ttwstatic.com https://connect.facebook.net https://www.facebook.com https://www.googletagmanager.com",
 
-                // ✅ iframe ของ GSI + reCAPTCHA
-                "frame-src 'self' https://accounts.google.com https://www.google.com https://www.google.com/recaptcha/ https://*.tiktok.com https://*.youtube.com",
+                // ✅ DEV: iframes (GSI, recaptcha, TikTok, YouTube, Facebook)
+                "frame-src 'self' https://accounts.google.com https://www.google.com https://www.google.com/recaptcha/ https://*.tiktok.com https://*.youtube.com https://www.facebook.com https://connect.facebook.net",
 
                 // (เผื่อเบราว์เซอร์บางตัว)
-                "child-src 'self' https://accounts.google.com https://www.google.com https://www.google.com/recaptcha/ https://*.tiktok.com https://*.youtube.com",
+                "child-src 'self' https://accounts.google.com https://www.google.com https://www.google.com/recaptcha/ https://*.tiktok.com https://*.youtube.com https://www.facebook.com https://connect.facebook.net",
 
-                // ✅ network calls
-                "connect-src * https://oauth2.googleapis.com",
+                // ✅ DEV: network calls (เพิ่ม FB + GTM + GA + graph.facebook.com)
+                "connect-src * https://oauth2.googleapis.com https://*.ttwstatic.com https://www.facebook.com https://connect.facebook.net https://graph.facebook.com https://www.googletagmanager.com https://www.google-analytics.com",
 
-                // ✅ รูปภาพ (คงเดิม)
-                "img-src 'self' data: blob: https://res.cloudinary.com https://images.unsplash.com https://*.tiktokcdn.com https://*.tiktokcdn-us.com https://i.ytimg.com https://*.googleusercontent.com https://maps.gstatic.com https://www.gstatic.com https://*.ggpht.com https://maps.googleapis.com",
+                // ✅ DEV: รูปภาพ (ปล่อย * อยู่แล้ว)
+                "img-src * data: blob: 'unsafe-inline'",
 
-                // ⬇️ เพิ่ม accounts.google.com และเพิ่ม style-src-elem (แตะเฉพาะส่วนนี้)
-                "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com",
-                "style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com",
+                // ✅ DEV: styles
+                "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com https://*.ttwstatic.com",
+                "style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com https://*.ttwstatic.com",
 
                 "font-src 'self' https://fonts.gstatic.com data:",
               ].join("; "),
@@ -86,29 +90,34 @@ const nextConfig: NextConfig = {
       "object-src 'none'",
       "worker-src 'self' blob:",
 
-      // ✅ Scripts: Google (GSI/recaptcha/Maps), TikTok, YouTube
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.google.com https://www.gstatic.com https://accounts.google.com https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/ https://maps.googleapis.com https://www.tiktok.com https://www.youtube.com",
-      "script-src-elem 'self' 'unsafe-inline' https://www.google.com https://www.gstatic.com https://accounts.google.com https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/ https://maps.googleapis.com https://www.tiktok.com https://www.youtube.com",
+      // ✅ PROD: Scripts: Google (GSI/recaptcha/Maps), TikTok, YouTube, TikTok static, Facebook, GTM
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.google.com https://www.gstatic.com https://accounts.google.com https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/ https://maps.googleapis.com https://www.tiktok.com https://www.youtube.com https://*.ttwstatic.com https://connect.facebook.net https://www.facebook.com https://www.googletagmanager.com",
+      "script-src-elem 'self' 'unsafe-inline' https://www.google.com https://www.gstatic.com https://accounts.google.com https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/ https://maps.googleapis.com https://www.tiktok.com https://www.youtube.com https://*.ttwstatic.com https://connect.facebook.net https://www.facebook.com https://www.googletagmanager.com",
 
-      // ✅ Frames (embeds)
-      "frame-src 'self' https://www.google.com https://accounts.google.com https://www.google.com/recaptcha/ https://*.tiktok.com https://*.youtube.com",
-      // บราวเซอร์บางตัวใช้ child-src กับ iframe เก่า ๆ
-      "child-src 'self' https://www.google.com https://accounts.google.com https://www.google.com/recaptcha/ https://*.tiktok.com https://*.youtube.com",
+      // ✅ PROD: Frames (embeds)
+      "frame-src 'self' https://www.google.com https://accounts.google.com https://www.google.com/recaptcha/ https://*.tiktok.com https://*.youtube.com https://www.facebook.com https://connect.facebook.net",
+      "child-src 'self' https://www.google.com https://accounts.google.com https://www.google.com/recaptcha/ https://*.tiktok.com https://*.youtube.com https://www.facebook.com https://connect.facebook.net",
 
-      // ✅ Network calls (⬇️ เพิ่ม www.10topawards.com เท่านั้น)
-      "connect-src 'self' https://10topawards.com https://www.10topawards.com https://www.google.com https://www.googleapis.com https://maps.googleapis.com https://*.tiktok.com https://*.tiktokcdn.com https://*.tiktokcdn-us.com https://*.youtube.com",
+      // ✅ PROD: Network calls
+      "connect-src 'self' https://10topawards.com https://www.10topawards.com https://www.google.com https://www.googleapis.com https://maps.googleapis.com https://*.tiktok.com https://*.tiktokcdn.com https://*.tiktokcdn-us.com https://*.youtube.com https://*.ttwstatic.com https://www.facebook.com https://connect.facebook.net https://graph.facebook.com https://www.googletagmanager.com https://www.google-analytics.com",
 
-      // ✅ Images/Icons (รวม Maps/ggpht)
-      "img-src 'self' data: blob: https://res.cloudinary.com https://images.unsplash.com https://*.tiktokcdn.com https://*.tiktokcdn-us.com https://i.ytimg.com https://*.googleusercontent.com https://lh3.googleusercontent.com https://maps.gstatic.com https://www.gstatic.com https://*.ggpht.com https://maps.googleapis.com",
+      // ✅ PROD: Images/Icons — เพิ่ม 10topawards.com + www.10topawards.com
+      "img-src 'self' data: blob: https://10topawards.com https://www.10topawards.com https://res.cloudinary.com https://images.unsplash.com https://*.tiktokcdn.com https://*.tiktokcdn-us.com https://i.ytimg.com https://*.googleusercontent.com https://lh3.googleusercontent.com https://maps.gstatic.com https://www.gstatic.com https://*.ggpht.com https://maps.googleapis.com https://*.ttwstatic.com https://www.facebook.com https://connect.facebook.net https://graph.facebook.com https://www.google-analytics.com",
 
-      // ✅ Styles/Fonts (⬇️ เพิ่ม accounts.google.com และเพิ่ม style-src-elem)
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com",
-      "style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com",
+      // ✅ PROD: Styles/Fonts
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com https://*.ttwstatic.com",
+      "style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com https://*.ttwstatic.com",
       "font-src 'self' https://fonts.gstatic.com data:",
     ].join("; ");
 
-    const coopUnsafeNone = { key: "Cross-Origin-Opener-Policy", value: "unsafe-none" };
-    const coopAllowPopups = { key: "Cross-Origin-Opener-Policy", value: "same-origin-allow-popups" };
+    const coopUnsafeNone = {
+      key: "Cross-Origin-Opener-Policy",
+      value: "unsafe-none",
+    };
+    const coopAllowPopups = {
+      key: "Cross-Origin-Opener-Policy",
+      value: "same-origin-allow-popups",
+    };
 
     return [
       { source: "/", headers: [coopUnsafeNone] },

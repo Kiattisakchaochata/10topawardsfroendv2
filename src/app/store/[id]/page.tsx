@@ -15,6 +15,10 @@ import TikTokReload from "@/components/TikTokReload";
 import TrackingInjector from "@/app/_components/TrackingInjector";
 import { extractIframeSrc } from "@/lib/googleMap";
 
+// ✅ เพิ่มสองอันนี้
+import { fetchSiteSeo, fetchPageSeoByPath } from "@/seo/fetchers";
+import SeoJsonLdFromApi from "@/components/SeoJsonLdFromApi";
+
 /* ---------- types ---------- */
 type PageProps = { params: Promise<{ id: string }> };
 type MetadataProps = { params: Promise<{ id: string }> };
@@ -52,7 +56,7 @@ type Video = {
 };
 
 /* ---------- consts ---------- */
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8877/api").replace(/\/$/, "");
+const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8899/api").replace(/\/$/, "");
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 const AUTH_COOKIE = process.env.AUTH_COOKIE_NAME || process.env.NEXT_PUBLIC_AUTH_COOKIE || "token";
 
@@ -265,6 +269,11 @@ function buildMapsEmbedUrl(
   return q ? `https://www.google.com/maps?output=embed&q=${encodeURIComponent(q)}&z=16` : null;
 }
 
+// ✅ helper แปลง keyword string → string[]
+function toKeywordArray(kw?: string | null): string[] | undefined {
+  if (!kw || !kw.trim()) return undefined;
+  return kw.split(",").map((s) => s.trim()).filter(Boolean);
+}
 
 /* ---------- data loaders ---------- */
 async function getStore(id: string): Promise<Store | null> {
@@ -354,6 +363,7 @@ async function getReviewStats(storeId: string): Promise<{ avg?: number; count: n
 export async function generateMetadata({ params }: MetadataProps): Promise<Metadata> {
   const { id: raw } = await params;
   const id = decodeURIComponent(String(raw || ""));
+  const path = `/store/${id}`;
 
   if (!isSafeStoreId(id)) {
     return {
@@ -364,7 +374,13 @@ export async function generateMetadata({ params }: MetadataProps): Promise<Metad
     };
   }
 
-  const store = await getStore(id);
+  // ✅ ดึงทั้งข้อมูลร้าน + SEO ของ path นี้
+  const [store, siteSeo, pageSeo] = await Promise.all([
+    getStore(id),
+    fetchSiteSeo(),
+    fetchPageSeoByPath(path),
+  ]);
+
   if (!store || !isStoreEnabledPublic(store)) {
     return {
       title: "ไม่พบร้าน | TopAward",
@@ -374,16 +390,32 @@ export async function generateMetadata({ params }: MetadataProps): Promise<Metad
     };
   }
 
-  const title = `${store.name} | TopAward`;
-  const description = store.description?.slice(0, 155) || `รายละเอียดร้าน ${store.name} บน TopAward`;
+  const seoTitle = (pageSeo as any)?.title || null;
+  const seoDesc  = (pageSeo as any)?.description || null;
+  const seoKw    = (pageSeo as any)?.keywords ?? (siteSeo as any)?.keywords ?? null;
+  const seoOg    = (pageSeo as any)?.og_image || null;
+
+  const title = seoTitle || `${store.name} | TopAward`;
+  const description =
+    seoDesc ||
+    store.description?.slice(0, 155) ||
+    `รายละเอียดร้าน ${store.name} บน TopAward`;
   const url = `${SITE_URL}/store/${store.id}`;
-  const ogImage = store.cover_image || store.images?.[0]?.image_url || undefined;
+  const ogImage = seoOg || store.cover_image || store.images?.[0]?.image_url || undefined;
+  const keywords = toKeywordArray(seoKw);
 
   return {
     title,
     description,
     alternates: { canonical: url },
-    openGraph: { type: "website", url, title, description, images: ogImage ? [{ url: ogImage }] : undefined },
+    openGraph: {
+      type: "website",
+      url,
+      title,
+      description,
+      images: ogImage ? [{ url: ogImage }] : undefined,
+    },
+    keywords, // ✅ meta keywords ต่อหน้าร้าน
   };
 }
 
@@ -472,16 +504,34 @@ export default async function StoreDetailPage({ params }: PageProps) {
       {/* Tracking & LD */}
       <TrackingInjector storeId={id} />
       <TikTokReload storeId={store.id} />
-      
-      <Script id="ld-breadcrumb-store" type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ldBreadcrumb) }} />
-      <Script id="ld-localbusiness-store" type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ldLocalBusiness) }} />
+
+      {/* ✅ JSON-LD จากระบบ SEO (Admin Page SEO) ตาม path /store/[id] */}
+      {/* @ts-expect-error Server Component */}
+      <SeoJsonLdFromApi path={`/store/${store.id}`} />
+
+      <Script
+        id="ld-breadcrumb-store"
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(ldBreadcrumb) }}
+      />
+      <Script
+        id="ld-localbusiness-store"
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(ldLocalBusiness) }}
+      />
 
       {/* BG + content */}
       <div className="relative">
         <VisitPing kind="store" storeId={store.id} />
 
-        <div className="pointer-events-none absolute inset-0" aria-hidden
-          style={{ background: "radial-gradient(1200px 600px at 10% -10%, rgba(212,175,55,.08), transparent 55%), radial-gradient(1200px 600px at 90% 0%, rgba(184,134,11,.07), transparent 50%)" }} />
+        <div
+          className="pointer-events-none absolute inset-0"
+          aria-hidden
+          style={{
+            background:
+              "radial-gradient(1200px 600px at 10% -10%, rgba(212,175,55,.08), transparent 55%), radial-gradient(1200px 600px at 90% 0%, rgba(184,134,11,.07), transparent 50%)",
+          }}
+        />
 
         <div className="relative mx-auto max-w-7xl px-4 py-6 lg:py-8">
           {/* breadcrumb */}
@@ -534,12 +584,26 @@ export default async function StoreDetailPage({ params }: PageProps) {
                   </button>
                   <div className="grid grid-cols-4 gap-2 md:grid-cols-1">
                     {images.slice(1, 6).map((src, i) => (
-                      <button type="button" key={src + i} className="relative overflow-hidden rounded-lg ring-1 ring-white/10 bg-black/20" data-lb-open data-index={i + 1} aria-label={`เปิดภาพที่ ${i + 2}`}>
-                        <img src={src} alt="" className="aspect-[4/3] h-full w-full object-cover transition duration-300 hover:scale-[1.03]" loading="lazy" />
+                      <button
+                        type="button"
+                        key={src + i}
+                        className="relative overflow-hidden rounded-lg ring-1 ring-white/10 bg-black/20"
+                        data-lb-open
+                        data-index={i + 1}
+                        aria-label={`เปิดภาพที่ ${i + 2}`}
+                      >
+                        <img
+                          src={src}
+                          alt=""
+                          className="aspect-[4/3] h-full w-full object-cover transition duration-300 hover:scale-[1.03]"
+                          loading="lazy"
+                        />
                       </button>
                     ))}
                     {images.length <= 1 && (
-                      <div className="grid aspect-[4/3] place-items-center rounded-lg ring-1 ring-white/10 text-slate-300">ไม่มีรูปเพิ่มเติม</div>
+                      <div className="grid aspect-[4/3] place-items-center rounded-lg ring-1 ring-white/10 text-slate-300">
+                        ไม่มีรูปเพิ่มเติม
+                      </div>
                     )}
                   </div>
                 </div>
@@ -553,7 +617,12 @@ export default async function StoreDetailPage({ params }: PageProps) {
 
               {/* Reviews */}
               <section id="reviews" className="rounded-2xl border border-white/10 bg-white/5 p-4 md:p-6">
-                <StoreComments storeId={store.id} apiBase={API_URL} loggedIn={loggedIn} currentUserId={currentUserId} />
+                <StoreComments
+                  storeId={store.id}
+                  apiBase={API_URL}
+                  loggedIn={loggedIn}
+                  currentUserId={currentUserId}
+                />
               </section>
             </div>
 
@@ -571,42 +640,96 @@ export default async function StoreDetailPage({ params }: PageProps) {
                     <dd className="flex-1">
                       {(() => {
                         const chips: Array<JSX.Element> = [];
-                        if (social.line) chips.push(<a key="line" href={social.line} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-lg bg-[#06C755]/90 px-3 py-1.5 text-sm font-semibold text-black hover:brightness-110"><span>LINE</span></a>);
-                        if (social.facebook) chips.push(<a key="facebook" href={social.facebook} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-lg bg-[#1877F2]/90 px-3 py-1.5 text-sm font-semibold text-white hover:brightness-110"><span>Facebook</span></a>);
-                        if (social.tiktok) chips.push(<a key="tiktok" href={social.tiktok} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-lg bg-white/10 px-3 py-1.5 text-sm font-semibold text-white hover:bg-white/15"><span>🎵 TikTok</span></a>);
-                        if (social.instagram) chips.push(<a key="instagram" href={social.instagram} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-pink-500 to-rose-500 px-3 py-1.5 text-sm font-semibold text-white hover:brightness-110"><span>📸 Instagram</span></a>);
-                        return chips.length ? <div className="flex flex-wrap gap-2">{chips}</div> : <div className="flex flex-wrap gap-2"><span className="text-white/50">-</span></div>;
+                        if (social.line)
+                          chips.push(
+                            <a
+                              key="line"
+                              href={social.line}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-2 rounded-lg bg-[#06C755]/90 px-3 py-1.5 text-sm font-semibold text-black hover:brightness-110"
+                            >
+                              <span>LINE</span>
+                            </a>
+                          );
+                        if (social.facebook)
+                          chips.push(
+                            <a
+                              key="facebook"
+                              href={social.facebook}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-2 rounded-lg bg-[#1877F2]/90 px-3 py-1.5 text-sm font-semibold text-white hover:brightness-110"
+                            >
+                              <span>Facebook</span>
+                            </a>
+                          );
+                        if (social.tiktok)
+                          chips.push(
+                            <a
+                              key="tiktok"
+                              href={social.tiktok}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-2 rounded-lg bg-white/10 px-3 py-1.5 text-sm font-semibold text-white hover:bg-white/15"
+                            >
+                              <span>🎵 TikTok</span>
+                            </a>
+                          );
+                        if (social.instagram)
+                          chips.push(
+                            <a
+                              key="instagram"
+                              href={social.instagram}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-pink-500 to-rose-500 px-3 py-1.5 text-sm font-semibold text-white hover:brightness-110"
+                            >
+                              <span>📸 Instagram</span>
+                            </a>
+                          );
+                        return chips.length ? (
+                          <div className="flex flex-wrap gap-2">{chips}</div>
+                        ) : (
+                          <div className="flex flex-wrap gap-2">
+                            <span className="text-white/50">-</span>
+                          </div>
+                        );
                       })()}
                     </dd>
                   </div>
                   <div className="flex gap-2">
                     <dt className="w-24 shrink-0 text-white/60">อัปเดต</dt>
-                    <dd className="flex-1">{store.created_at ? new Date(store.created_at).toLocaleDateString("th-TH") : <span>-</span>}</dd>
+                    <dd className="flex-1">
+                      {store.created_at
+                        ? new Date(store.created_at).toLocaleDateString("th-TH")
+                        : <span>-</span>}
+                    </dd>
                   </div>
                 </dl>
 
                 {/* Map */}
                 {(() => {
                   const rawMap = social.map || undefined;
-// ถ้าเป็น <iframe ...> ดึง src; ถ้าเป็นลิงก์ปกติ (เช่น https://maps.app.goo.gl/...) ใช้ตามนั้นเลย
-const mapHref = rawMap
-  ? (/<iframe/i.test(rawMap) ? extractIframeSrc(rawMap)! : rawMap)
-  : undefined;
+                  // ถ้าเป็น <iframe ...> ดึง src; ถ้าเป็นลิงก์ปกติ (เช่น https://maps.app.goo.gl/...) ใช้ตามนั้นเลย
+                  const mapHref = rawMap
+                    ? (/<iframe/i.test(rawMap) ? extractIframeSrc(rawMap)! : rawMap)
+                    : undefined;
 
-const mapEmbed = buildMapsEmbedUrl(mapHref, store.address, store.name);
+                  const mapEmbed = buildMapsEmbedUrl(mapHref, store.address, store.name);
                   return (
                     <div className="mt-4 space-y-3">
                       <div className="flex items-center justify-between">
                         <h4 className="font-semibold text-white/90">แผนที่</h4>
                         {mapHref && (
                           <a
-  href={buildDirectionsUrl(mapHref, store.address, store.name)}
-  target="_blank"
-  rel="noopener noreferrer"
-  className="rounded-lg bg-white/10 px-3 py-1.5 text-sm text-yellow-500 hover:bg-white/15 ring-1 ring-white/15"
->
-  เปิดนำทางใน Google Maps
-</a>
+                            href={buildDirectionsUrl(mapHref, store.address, store.name)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="rounded-lg bg-white/10 px-3 py-1.5 text-sm text-yellow-500 hover:bg-white/15 ring-1 ring-white/15"
+                          >
+                            เปิดนำทางใน Google Maps
+                          </a>
                         )}
                       </div>
 
@@ -631,14 +754,21 @@ const mapEmbed = buildMapsEmbedUrl(mapHref, store.address, store.name);
                 })()}
 
                 <div className="mt-4">
-                  <Link href="/" className="inline-flex items-center justify-center rounded-lg px-4 py-2 font-semibold text-black bg-gradient-to-r from-[#FFD700] to-[#B8860B] hover:from-[#FFCC33] hover:to-[#FFD700] shadow-md transition">
+                  <Link
+                    href="/"
+                    className="inline-flex items-center justify-center rounded-lg px-4 py-2 font-semibold text:black bg-gradient-to-r from-[#FFD700] to-[#B8860B] hover:from-[#FFCC33] hover:to-[#FFD700] shadow-md transition"
+                  >
                     ← กลับหน้าหลัก
                   </Link>
                 </div>
               </div>
 
               {/* Videos */}
-              <section id="videos" key={`videos-${store.id}-${videosToShow.length}`} className="rounded-2xl border border-white/10 bg-white/5 p-3">
+              <section
+                id="videos"
+                key={`videos-${store.id}-${videosToShow.length}`}
+                className="rounded-2xl border border-white/10 bg-white/5 p-3"
+              >
                 <h4 className="px-1 pb-3 text-white/90">วิดีโอของร้าน</h4>
                 {videosToShow.length === 0 ? (
                   <p className="px-1 pb-2 text-slate-300">ยังไม่มีวิดีโอ</p>
@@ -650,13 +780,19 @@ const mapEmbed = buildMapsEmbedUrl(mapHref, store.address, store.name);
                         if (!id) return null;
                         if (v.tiktok_url && !v.tiktok_embed_url) {
                           return (
-                            <li key={`tk-${v.id}`} className="rounded-xl ring-1 ring-white/10 bg-black/20 p-3 text-sm text-slate-300">
+                            <li
+                              key={`tk-${v.id}`}
+                              className="rounded-xl ring-1 ring-white/10 bg-black/20 p-3 text-sm text-slate-300"
+                            >
                               ไม่สามารถฝังวิดีโอ TikTok ได้: ลิงก์นี้ไม่ใช่วิดีโอ หรือเป็นลิงก์สั้น vt.tiktok.com
                             </li>
                           );
                         }
                         return (
-                          <li key={`yt-${v.id}`} className="overflow-hidden rounded-xl ring-1 ring-white/10 bg-black/20">
+                          <li
+                            key={`yt-${v.id}`}
+                            className="overflow-hidden rounded-xl ring-1 ring-white/10 bg-black/20"
+                          >
                             <div className="aspect-[16/9] w-full">
                               <iframe
                                 className="h-full w-full"
@@ -666,38 +802,53 @@ const mapEmbed = buildMapsEmbedUrl(mapHref, store.address, store.name);
                                 allowFullScreen
                               />
                             </div>
-                            {v.title && <div className="p-3 text-xs text-white/85 line-clamp-2">{v.title}</div>}
+                            {v.title && (
+                              <div className="p-3 text-xs text-white/85 line-clamp-2">
+                                {v.title}
+                              </div>
+                            )}
                           </li>
                         );
                       }
                       if (v.tiktok_url) {
-  // ใช้ URL ที่คำนวณไว้แล้วจาก getStoreVideos()
-  const src = (v.tiktok_embed_url || tkEmbedUrl(v.tiktok_url)) ?? null;
-  if (!src) {
-    return (
-      <li key={`tk-${v.id}`} className="rounded-xl ring-1 ring-white/10 bg-black/20 p-3 text-sm text-slate-300">
-        ไม่สามารถฝังวิดีโอ TikTok ได้: ลิงก์นี้ไม่ใช่วิดีโอ หรือเป็นลิงก์สั้น vt.tiktok.com
-      </li>
-    );
-  }
-  return (
-    <li key={`tk-${v.id}`} className="overflow-hidden rounded-xl ring-1 ring-white/10 bg-black/20">
-      <div className="relative aspect-[9/16] w-full">
-        <iframe
-          src={`${src}?autoplay=0&muted=1`}
-          className="absolute inset-0 h-full w-full"
-          title={v.title || "TikTok video"}
-          loading="lazy"
-          // ✅ ทำงานได้แม้มี CSP เข้มงวด และไม่ต้องโหลด embed.js
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
-          allowFullScreen
-          referrerPolicy="origin-when-cross-origin"
-        />
-      </div>
-      {v.title && <div className="p-3 text-xs text-white/85 line-clamp-2">{v.title}</div>}
-    </li>
-  );
-}
+                        // ใช้ URL ที่คำนวณไว้แล้วจาก getStoreVideos()
+                        const src =
+                          (v.tiktok_embed_url || tkEmbedUrl(v.tiktok_url)) ?? null;
+                        if (!src) {
+                          return (
+                            <li
+                              key={`tk-${v.id}`}
+                              className="rounded-xl ring-1 ring-white/10 bg-black/20 p-3 text-sm text-slate-300"
+                            >
+                              ไม่สามารถฝังวิดีโอ TikTok ได้: ลิงก์นี้ไม่ใช่วิดีโอ หรือเป็นลิงก์สั้น vt.tiktok.com
+                            </li>
+                          );
+                        }
+                        return (
+                          <li
+                            key={`tk-${v.id}`}
+                            className="overflow-hidden rounded-xl ring-1 ring-white/10 bg-black/20"
+                          >
+                            <div className="relative aspect-[9/16] w-full">
+                              <iframe
+                                src={`${src}?autoplay=0&muted=1`}
+                                className="absolute inset-0 h-full w-full"
+                                title={v.title || "TikTok video"}
+                                loading="lazy"
+                                // ✅ ทำงานได้แม้มี CSP เข้มงวด และไม่ต้องโหลด embed.js
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+                                allowFullScreen
+                                referrerPolicy="origin-when-cross-origin"
+                              />
+                            </div>
+                            {v.title && (
+                              <div className="p-3 text-xs text-white/85 line-clamp-2">
+                                {v.title}
+                              </div>
+                            )}
+                          </li>
+                        );
+                      }
                       return null;
                     })}
                   </ul>
@@ -711,21 +862,45 @@ const mapEmbed = buildMapsEmbedUrl(mapHref, store.address, store.name);
       {/* Lightbox */}
       {images.length > 0 && (
         <>
-          <div id="lb" key={`lb-${store.id}`} className="fixed inset-0 z-[9999] hidden items-center justify-center bg-black/80 p-4 backdrop-blur" aria-modal="true" role="dialog">
-            <button id="lb-close" className="fixed right-4 top-4 z-[10000] rounded-lg bg-white/10 px-3 py-2 text-sm text-white ring-1 ring-white/20 hover:bg-white/15">ปิด</button>
+          <div
+            id="lb"
+            key={`lb-${store.id}`}
+            className="fixed inset-0 z-[9999] hidden items-center justify-center bg-black/80 p-4 backdrop-blur"
+            aria-modal="true"
+            role="dialog"
+          >
+            <button
+              id="lb-close"
+              className="fixed right-4 top-4 z-[10000] rounded-lg bg-white/10 px-3 py-2 text-sm text-white ring-1 ring-white/20 hover:bg-white/15"
+            >
+              ปิด
+            </button>
             <div className="relative mx-auto flex max-w-[min(1100px,95vw)] flex-col">
               <div className="flex items-center justify-center">
-                <button id="lb-prev" className="mr-3 hidden h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white ring-1 ring-white/20 hover:bg-white/15 md:flex">‹</button>
+                <button
+                  id="lb-prev"
+                  className="mr-3 hidden h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white ring-1 ring-white/20 hover:bg-white/15 md:flex"
+                >
+                  ‹
+                </button>
                 <div className="h-[min(85vh,720px)] w-[min(95vw,1100px)] overflow-hidden rounded-2xl ring-1 ring-white/15 bg-black/40">
                   <img id="lb-img" alt="" className="h-full w-full object-contain" />
                 </div>
-                <button id="lb-next" className="ml-3 hidden h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white ring-1 ring-white/20 hover:bg-white/15 md:flex">›</button>
+                <button
+                  id="lb-next"
+                  className="ml-3 hidden h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white ring-1 ring-white/20 hover:bg-white/15 md:flex"
+                >
+                  ›
+                </button>
               </div>
             </div>
           </div>
 
-          <Script id="lb-controller" strategy="afterInteractive" dangerouslySetInnerHTML={{
-            __html: `
+          <Script
+            id="lb-controller"
+            strategy="afterInteractive"
+            dangerouslySetInnerHTML={{
+              __html: `
 (function () {
   var W = window, D = document;
   if (W.__LB) return;
@@ -745,10 +920,15 @@ const mapEmbed = buildMapsEmbedUrl(mapHref, store.address, store.name);
     }
   };
   W.__LB.bind();
-})();`}} />
+})();`,
+            }}
+          />
 
-          <Script id={`lb-set-${store.id}`} strategy="afterInteractive" dangerouslySetInnerHTML={{
-            __html: `
+          <Script
+            id={`lb-set-${store.id}`}
+            strategy="afterInteractive"
+            dangerouslySetInnerHTML={{
+              __html: `
 (function () {
   if (window.__LB) {
     window.__LB.images = [].concat(${JSON.stringify(images)});
@@ -756,7 +936,9 @@ const mapEmbed = buildMapsEmbedUrl(mapHref, store.address, store.name);
     var imgEl = document.getElementById('lb-img');
     if (imgEl) { imgEl.removeAttribute('src'); imgEl.setAttribute('src', ${JSON.stringify(images[0] || "")}); }
   }
-})();`}} />
+})();`,
+            }}
+          />
         </>
       )}
     </>

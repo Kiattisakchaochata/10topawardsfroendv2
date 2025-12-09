@@ -118,10 +118,22 @@ function displayThumb(youtubeUrl?: string | null, explicit?: string | null) {
 
 // ✅ alias กันพลาดชื่อ
 const displayThumbUrl = displayThumb;
-/* ✅ เพิ่มฟังก์ชัน proxifyImage ตรงนี้เลย */
+
+// ✅ ให้ proxy เฉพาะรูปจาก tiktokcdn ที่เสี่ยง 403
 function proxifyImage(u: string | null | undefined) {
   if (!u) return null;
-  return `/api/proxy/image?u=${encodeURIComponent(u)}`;
+  try {
+    const url = new URL(u);
+    // ถ้าเป็นรูปจาก TikTok CDN ค่อยผ่าน proxy
+    if (url.hostname.includes("tiktokcdn")) {
+      return `/api/proxy/image?u=${encodeURIComponent(u)}`;
+    }
+    // ถ้าเป็น Cloudinary หรือ host อื่น -> ใช้ URL ตรง ๆ
+    return u;
+  } catch {
+    // ถ้า parse URL พลาดก็ใช้ค่าเดิม
+    return u;
+  }
 }
 
 function cleanPayload<T extends Record<string, any>>(obj: T): Partial<T> {

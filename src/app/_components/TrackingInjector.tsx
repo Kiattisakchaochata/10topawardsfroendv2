@@ -1,11 +1,12 @@
+// src/app/_components/TrackingInjector.tsx
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import Script from 'next/script';
 
-type Placement  = 'HEAD' | 'BODY_START' | 'BODY_END';
-type Strategy   = 'beforeInteractive' | 'afterInteractive' | 'lazyOnload' | string;
+type Placement = 'HEAD' | 'BODY_START' | 'BODY_END';
+type Strategy = 'beforeInteractive' | 'afterInteractive' | 'lazyOnload' | string;
 
 type Item = {
   id: string;
@@ -26,7 +27,12 @@ function genDefaultSnippet(provider: string, trackingId: string) {
       return `
         window.dataLayer = window.dataLayer || [];
         function gtag(){dataLayer.push(arguments);}
-        (function(){var s=document.createElement('script');s.async=true;s.src='https://www.googletagmanager.com/gtag/js?id=${id}';document.head.appendChild(s);}());
+        (function(){
+          var s=document.createElement('script');
+          s.async=true;
+          s.src='https://www.googletagmanager.com/gtag/js?id=${id}';
+          document.head.appendChild(s);
+        }());
         gtag('js', new Date());
         gtag('config', '${id}');
       `.trim();
@@ -42,23 +48,36 @@ function genDefaultSnippet(provider: string, trackingId: string) {
 
     case 'FacebookPixel':
       return `
-        !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-        n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
-        n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
-        t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window, document,'script',
-        'https://connect.facebook.net/en_US/fbevents.js');
-        fbq('init', '${id}');
-        fbq('track', 'PageView');
+        (function(f,b,e,v,n,t,s){
+          if (f.fbq) return;
+          n = f.fbq = function(){
+            n.callMethod ? n.callMethod.apply(n,arguments) : n.queue.push(arguments)
+          };
+          if (!f._fbq) f._fbq = n;
+          n.push = n; n.loaded = !0; n.version = '2.0'; n.queue = [];
+          t = b.createElement(e); t.async = !0;
+          t.src = v;
+          s = b.getElementsByTagName(e)[0];
+          s.parentNode.insertBefore(t,s);
+        })(window, document, 'script', 'https://connect.facebook.net/en_US/fbevents.js');
+
+        window.fbq('init', '${id}');
+        window.fbq('track', 'PageView');
       `.trim();
 
     case 'TikTokPixel':
       return `
         !function (w, d, t) {
-          w.TiktokAnalyticsObject=t;var tt=w[t]=w[t]||[];tt.methods=['page','track','identify','instances','debug','on','off','once','ready','alias','group','enableCookie'];
-          tt.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<tt.methods.length;i++)tt.setAndDefer(tt,tt.methods[i]);
-          tt.load=function(e){var n='https://analytics.tiktok.com/i18n/pixel/events.js';
-          tt._i=tt._i||{};tt._i[e]=[];var a=d.createElement('script');a.type='text/javascript';a.async=!0;a.src=n+'?sdkid='+e+'&lib='+t;
-          var s=d.getElementsByTagName('script')[0];s.parentNode.insertBefore(a,s)};
+          w.TiktokAnalyticsObject=t;var tt=w[t]=w[t]||[];
+          tt.methods=['page','track','identify','instances','debug','on','off','once','ready','alias','group','enableCookie'];
+          tt.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};
+          for(var i=0;i<tt.methods.length;i++)tt.setAndDefer(tt,tt.methods[i]);
+          tt.load=function(e){
+            var n='https://analytics.tiktok.com/i18n/pixel/events.js';
+            tt._i=tt._i||{};tt._i[e]=[];
+            var a=d.createElement('script');a.type='text/javascript';a.async=!0;a.src=n+'?sdkid='+e+'&lib='+t;
+            var s=d.getElementsByTagName('script')[0];s.parentNode.insertBefore(a,s)
+          };
           tt.load('${id}');
           tt.page();
         }(window, document, 'ttq');
@@ -69,8 +88,10 @@ function genDefaultSnippet(provider: string, trackingId: string) {
   }
 }
 
-function mapStrategy(s: Strategy): 'beforeInteractive' | 'afterInteractive' | 'lazyOnload' {
-  return (s === 'beforeInteractive' || s === 'afterInteractive' || s === 'lazyOnload')
+function mapStrategy(
+  s: Strategy
+): 'beforeInteractive' | 'afterInteractive' | 'lazyOnload' {
+  return s === 'beforeInteractive' || s === 'afterInteractive' || s === 'lazyOnload'
     ? s
     : 'afterInteractive';
 }
@@ -89,20 +110,39 @@ export default function TrackingInjector({ storeId }: { storeId?: string }) {
   const [items, setItems] = useState<Item[]>([]);
   const [loaded, setLoaded] = useState(false);
 
-  // ✅ hook ทั้งหมดถูกเรียกก่อนเงื่อนไข return แล้ว
+  console.log('[TrackingInjector] render', { pathname, storeId });
+
   useEffect(() => {
-    if (pathname === '/login') return; // ข้ามโหลดถ้าอยู่หน้า login
+    console.log('[TrackingInjector] useEffect start', { pathname, storeId });
+
+    if (pathname === '/login') {
+      console.log('[TrackingInjector] skip on /login');
+      return;
+    }
 
     (async () => {
       try {
         const url = storeId
           ? `/api/tracking-scripts?storeId=${encodeURIComponent(storeId)}`
           : '/api/tracking-scripts';
+
+        console.log('[TrackingInjector] fetching', url);
+
         const res = await fetch(url, { credentials: 'include' });
         const data = await res.json();
-        setItems(Array.isArray(data?.items) ? data.items.filter((i: Item) => i.enabled) : []);
-      } catch {
-        // swallow
+
+        console.log(
+          '[TrackingInjector] fetched items',
+          Array.isArray(data?.items) ? data.items.length : 0
+        );
+
+        setItems(
+          Array.isArray(data?.items)
+            ? data.items.filter((i: Item) => i.enabled)
+            : []
+        );
+      } catch (e) {
+        console.error('[TrackingInjector] fetch error', e);
       } finally {
         setLoaded(true);
       }
@@ -110,18 +150,30 @@ export default function TrackingInjector({ storeId }: { storeId?: string }) {
   }, [storeId, pathname]);
 
   const rendered = useMemo(() => {
-    if (pathname === '/login') return null; // ป้องกันยิง script หน้า login
+    if (pathname === '/login') return null;
     if (!items.length) return null;
 
     return items.map((it) => {
       const key = `trk-${it.id}`;
-      const strategy = it.placement === 'HEAD'
-        ? 'beforeInteractive'
-        : mapStrategy(it.strategy);
+      const strategy =
+        it.provider === 'FacebookPixel'
+          ? 'afterInteractive'
+          : it.placement === 'HEAD'
+            ? 'beforeInteractive'
+            : mapStrategy(it.strategy);
 
-      const code = it.script?.trim() || (it.trackingId ? genDefaultSnippet(it.provider, it.trackingId) : '');
+      const code =
+        it.script?.trim() ||
+        (it.trackingId ? genDefaultSnippet(it.provider, it.trackingId) : '');
 
       if (!code || isGsiSnippet(code)) return null;
+
+      console.log('[TrackingInjector] render script', {
+        id: it.id,
+        provider: it.provider,
+        placement: it.placement,
+        strategy,
+      });
 
       return (
         <Script id={key} key={key} strategy={strategy as any}>
@@ -131,6 +183,9 @@ export default function TrackingInjector({ storeId }: { storeId?: string }) {
     });
   }, [items, pathname]);
 
-  if (pathname === '/login' || !loaded || !rendered) return null;
+  if (pathname === '/login') return null;
+  if (!loaded) return null;
+  if (!rendered) return null;
+
   return <>{rendered}</>;
 }

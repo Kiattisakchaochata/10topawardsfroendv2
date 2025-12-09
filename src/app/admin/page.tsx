@@ -27,7 +27,13 @@ type Category = { id: string; name: string };
 type User = { id: string };
 type VisitorByStore = { store_id: string; store_name: string; count: number };
 type VisitorSummary = { total_visitors?: number; by_store?: VisitorByStore[] };
-
+type FeedbackRow = {
+  store_id: string;
+  store_name: string;
+  avg_food: number;
+  avg_service: number;
+  total_feedback: number;
+};
 type Store = {
   id: string;
   name: string;
@@ -164,14 +170,40 @@ async function getVisitorSummary(): Promise<VisitorSummary> {
     return d || {};
   } catch { return {}; }
 }
+async function getFeedbackSummary(): Promise<FeedbackRow[]> {
+  try {
+    const r = await fetchWithCookie("/admin/feedback/summary");
+    if (!r.ok) {
+      console.log("getFeedbackSummary !ok status =", r.status);
+      return [];
+    }
+    const d = await r.json();
+    console.log("feedbackSummary raw =", d);
 
+    if (Array.isArray(d)) return d;
+    if (Array.isArray((d as any).rows)) return (d as any).rows;
+    if (Array.isArray((d as any).summary)) return (d as any).summary;
+    return [];
+  } catch (err) {
+    console.log("getFeedbackSummary error =", err);
+    return [];
+  }
+}
 export default async function AdminDashboardPage() {
-  const [categories, activeRaw, expiredRaw, users, visitorSummary] = await Promise.all([
+  const [
+    categories,
+    activeRaw,
+    expiredRaw,
+    users,
+    visitorSummary,
+    feedbackRows,          // 👈 เพิ่มตัวนี้
+  ] = await Promise.all([
     getCategories(),
     getActiveStores(),
     getExpiredStores(),
     getUsers(),
     getVisitorSummary(),
+    getFeedbackSummary(),  // 👈 ตัวที่ 6 จะถูกเก็บใน feedbackRows
   ]);
 
   const active = (activeRaw || []).map(normalizeStore);
@@ -263,16 +295,17 @@ const visitorsFiltered = byStoreRaw.filter(v => validIds.has(String(v.store_id))
         {/* Main card (contains DashboardClient) */}
         <div className={`rounded-3xl ${THEME.glass} p-5 md:p-6 lg:p-8 shadow-xl`}>
           <DashboardClient
-            summary={{
-              users: users.length,
-              categories: categories.length,
-              stores: stores.length,
-              visitors: Number(totalVisitors) || 0,
-            }}
-            visitorsByStore={visitorsFiltered} 
-            stores={stores}
-            expiredFallback={Array.from(expiredMap.entries())}
-          />
+  summary={{
+    users: users.length,
+    categories: categories.length,
+    stores: stores.length,
+    visitors: Number(totalVisitors) || 0,
+  }}
+  visitorsByStore={visitorsFiltered}
+  stores={stores}
+  expiredFallback={Array.from(expiredMap.entries())}
+  feedbackSummary={feedbackRows}   // 👈 ส่งเข้าหน้า client
+/>
         </div>
       </div>
     </div>

@@ -2,21 +2,33 @@
 import { cookies } from "next/headers";
 import StoreManager from "./StoreManager";
 import ExpiryPanel from "./components/ExpiryPanel";
+import StoreFeedbackPanel from "@/components/admin/StoreFeedbackPanel";
+import StoreFeedbackQR from "@/components/admin/StoreFeedbackQR";
 
 export const dynamic = "force-dynamic";
 
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8899/api").replace(/\/$/, "");
+const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8899/api").replace(
+  /\/$/,
+  ""
+);
 const AUTH_COOKIE =
   process.env.AUTH_COOKIE_NAME || process.env.NEXT_PUBLIC_AUTH_COOKIE || "token";
 
 type Category = { id: string; name: string };
 type Image = { id?: string; image_url: string; order_number?: number | null };
 type Store = {
-  id: string; name: string; address?: string | null; description?: string | null;
-  social_links?: string | null; category_id?: string | null;
+  id: string;
+  name: string;
+  address?: string | null;
+  description?: string | null;
+  social_links?: string | null;
+  category_id?: string | null;
   category?: { id: string; name: string } | null;
-  cover_image?: string | null; images?: Image[]; order_number?: number | null;
+  cover_image?: string | null;
+  images?: Image[];
+  order_number?: number | null;
   expired_at?: string | null;
+  slug: string;
 };
 
 async function fetchWithCookie(path: string) {
@@ -35,7 +47,9 @@ async function getCategories(): Promise<Category[]> {
     if (!r.ok) return [];
     const d = await r.json();
     return Array.isArray(d) ? d : d?.categories || [];
-  } catch { return []; }
+  } catch {
+    return [];
+  }
 }
 
 async function getStores(): Promise<Store[]> {
@@ -44,7 +58,9 @@ async function getStores(): Promise<Store[]> {
     if (!r.ok) return [];
     const d = await r.json();
     return Array.isArray(d) ? d : d?.stores || [];
-  } catch { return []; }
+  } catch {
+    return [];
+  }
 }
 
 const THEME = {
@@ -62,7 +78,11 @@ export default async function AdminStoresPage() {
 
   return (
     <div className={`relative min-h-screen ${THEME.pageBg}`}>
-      <div className="pointer-events-none absolute inset-0 opacity-80" style={{ backgroundImage: THEME.fx }} />
+      <div
+        className="pointer-events-none absolute inset-0 opacity-80"
+        style={{ backgroundImage: THEME.fx }}
+      />
+
       <div className="relative mx-auto max-w-7xl px-4 py-8 lg:px-6 lg:py-10">
         {/* header */}
         <div className={`mb-6 rounded-3xl ${THEME.glass} px-6 py-6 shadow-2xl`}>
@@ -76,13 +96,17 @@ export default async function AdminStoresPage() {
 
         {/* content */}
         <div className="grid gap-8">
+          {/* การ์ดจัดการร้าน */}
           <div className={`rounded-3xl ${THEME.glass} p-5 md:p-6 lg:p-8 shadow-xl`}>
             <StoreManager initialCategories={categories} initialStores={stores} />
           </div>
 
+          {/* การ์ดร้านใกล้หมดอายุ */}
           <div className={`rounded-3xl ${THEME.glass} p-5 md:p-6 lg:p-8 shadow-xl`}>
             <ExpiryPanel />
           </div>
+
+              <StoreFeedbackPanel stores={stores} />
         </div>
       </div>
     </div>
