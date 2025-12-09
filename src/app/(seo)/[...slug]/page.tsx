@@ -2,11 +2,7 @@
 import { notFound } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import {
-  fetchSiteSeo,
-  fetchPageSeoByPath,
-  buildSeoForPath,
-} from "@/seo/fetchers";
+import { buildSeoForPath } from "@/seo/fetchers";
 import SeoJsonLdFromApi from "@/components/SeoJsonLdFromApi";
 
 export const dynamic = "force-dynamic";
@@ -18,8 +14,11 @@ const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").r
 );
 
 /** ---------- helpers ---------- */
-function toAbsolute(u: string) {
+function toAbsolute(u?: string | null) {
   try {
+    if (!u || typeof u !== "string") {
+      return SITE_URL;
+    }
     return new URL(u, SITE_URL + "/").toString();
   } catch {
     return SITE_URL;
@@ -49,20 +48,23 @@ export async function generateMetadata({
     return {};
   }
 
-  const title = page.title || site?.meta_title || "Topaward";
-  const description = page.description || site?.meta_description || "";
+  const title = (page as any)?.title || (site as any)?.meta_title || "Topaward";
+  const description =
+    (page as any)?.description || (site as any)?.meta_description || "";
 
   const ogImages: string[] = Array.from(
     new Set(
       [
-        ...(Array.isArray(page?.og_images) ? page.og_images : []),
-        ...(page?.og_image ? [page.og_image] : []),
-        ...(site?.og_image ? [site.og_image] : []),
+        ...((Array.isArray((page as any)?.og_images)
+          ? (page as any).og_images
+          : []) as string[]),
+        ...(((page as any)?.og_image ? [(page as any).og_image] : []) as string[]),
+        ...(((site as any)?.og_image ? [(site as any).og_image] : []) as string[]),
       ].filter(Boolean) as string[]
     )
   ).slice(0, 4);
 
-  const keywordSource = page?.keywords ?? site?.keywords;
+  const keywordSource = (page as any)?.keywords ?? (site as any)?.keywords;
 
   return {
     title,
@@ -75,7 +77,7 @@ export async function generateMetadata({
       images: ogImages.map((url) => ({ url: toAbsolute(url) })),
       siteName: "Topaward",
     },
-    robots: page.noindex ? { index: false, follow: false } : undefined,
+    robots: (page as any)?.noindex ? { index: false, follow: false } : undefined,
     keywords: toKeywordArray(keywordSource),
   };
 }
@@ -95,20 +97,19 @@ export default async function SeoPage({
     return notFound();
   }
 
-  const title = page.title || site?.meta_title || "Topaward";
+  const title = (page as any)?.title || (site as any)?.meta_title || "Topaward";
 
   return (
     <>
       <Navbar />
 
-      {/* JSON-LD จาก API */}
-      {/* <SeoJsonLdFromApi path={seoPath} /> */}
-
+      {/* JSON-LD จาก API สำหรับ path ปัจจุบัน */}
+      <SeoJsonLdFromApi path={seoPath} />
 
       <main className="container mx-auto max-w-5xl px-4 md:px-6 py-10 text-white">
         <h1 className="text-2xl font-semibold mb-2">{title}</h1>
-        {page.description && (
-          <p className="opacity-80">{page.description}</p>
+        { (page as any)?.description && (
+          <p className="opacity-80">{(page as any).description}</p>
         )}
       </main>
 

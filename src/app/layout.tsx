@@ -251,7 +251,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 
         {/* STEP 4: ใช้ GoogleOAuthProvider ด้วย CLIENT_ID ที่ถูกต้อง + ใส่ key เพื่อบังคับ remount */}
         <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID} key={GOOGLE_CLIENT_ID}>
-           <TrackingInjector />
+           {/* <TrackingInjector /> */}
           <LayoutClientWrapper>{children}</LayoutClientWrapper>
         </GoogleOAuthProvider>
       </body>
