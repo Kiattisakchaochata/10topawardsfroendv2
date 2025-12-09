@@ -3,6 +3,7 @@ import React from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { cookies } from "next/headers";
+import { safeUrl } from "@/lib/safeUrl";
 import Navbar from "@/components/Navbar";
 import BannerCarousel from "./_components/BannerCarousel";
 import VideoStrip from "./_components/VideoStrip";
@@ -281,13 +282,17 @@ async function getVideos(take = 12): Promise<Video[]> {
 
 /** ---------- Utils ---------- **/
 const firstImage = (s: Store) =>
-  s.cover_image ||
-  s.images?.[0]?.image_url ||
-  "https://images.unsplash.com/photo-1526318472351-c75fcf070305?q=80&w=1200&auto=format&fit=crop";
+  safeUrl(
+    s.cover_image ||
+      s.images?.[0]?.image_url ||
+      "https://images.unsplash.com/photo-1526318472351-c75fcf070305?q=80&w=1200&auto=format&fit=crop"
+  );
 
 const catImage = (c: Category) =>
-  c.cover_image ||
-  "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?q=80&w=1200&auto=format&fit=crop";
+  safeUrl(
+    c.cover_image ||
+      "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?q=80&w=1200&auto=format&fit=crop"
+  );
 
 const fmtTH = (iso?: string) =>
   iso ? new Date(iso).toLocaleDateString("th-TH") : "-";
