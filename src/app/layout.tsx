@@ -1,5 +1,5 @@
 // src/app/layout.tsx
-import AllPagesJsonLd from "./_seo/AllPagesJsonLd";
+//import AllPagesJsonLd from "./_seo/AllPagesJsonLd";
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Noto_Sans_Thai } from "next/font/google";
@@ -17,15 +17,21 @@ const notoThai = Noto_Sans_Thai({
 });
 
 /* ----------------------------- Constants ----------------------------- */
-// ✅ ใช้โฮสต์ canonical ให้ตรงกับที่ตั้งใจ (แนะนำ www)
-const RAW_SITE_URL = process.env.NEXT_PUBLIC_SITE_URL;
-if (!RAW_SITE_URL) {
-  throw new Error("NEXT_PUBLIC_SITE_URL is required (e.g. https://10topawards.com)");
-}
-const SITE_URL = RAW_SITE_URL.replace(/\/$/, "");
-const API_BASE = (process.env.NEXT_PUBLIC_API_BASE || process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "");
+
+// ถ้า env ไม่มี ให้ fallback เป็นโดเมนจริง
+const RAW_SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL || 'https://10topawards.com';
+
+export const SITE_URL = RAW_SITE_URL.replace(/\/$/, '');
+
+const RAW_API_BASE =
+  process.env.NEXT_PUBLIC_API_BASE || process.env.NEXT_PUBLIC_API_URL || '';
+
+export const API_BASE = RAW_API_BASE ? RAW_API_BASE.replace(/\/$/, '') : '';
+
 const APP_NAME = "TopAward";
-const APP_DESC = "รวมรีวิวร้าน/คลินิก/ที่เที่ยว พร้อมรูปภาพและเรตติ้ง จัดหมวดหมู่และค้นหาง่าย";
+const APP_DESC =
+  "รวมรีวิวร้าน/คลินิก/ที่เที่ยว พร้อมรูปภาพและเรตติ้ง จัดหมวดหมู่และค้นหาง่าย";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -99,16 +105,12 @@ export async function generateMetadata(): Promise<Metadata> {
     manifest: "/site.webmanifest",
     icons: {
   icon: [
-    { url: `${SITE_URL}/favicon.ico`, sizes: "any" },
-    { url: `${SITE_URL}/favicon-16x16.png`, sizes: "16x16", type: "image/png" },
-    { url: `${SITE_URL}/favicon-32x32.png`, sizes: "32x32", type: "image/png" },
-    { url: `${SITE_URL}/favicon-96x96.png`,  sizes: "96x96",  type: "image/png" },   // ⬅️ เพิ่ม
-        { url: `${SITE_URL}/favicon.svg`,        type: "image/svg+xml" },               // ⬅️ เพิ่ม
-    { url: `${SITE_URL}/favicon-192x192.png`, sizes: "192x192", type: "image/png" }, // เพิ่ม
-    { url: `${SITE_URL}/android-chrome-512x512.png`, sizes: "512x512", type: "image/png" },
+    { url: "/favicon.ico", sizes: "any" },
+    { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+    { url: "/favicon-96x96.png", sizes: "96x96", type: "image/png" },
+    { url: "/favicon.svg", type: "image/svg+xml" },
   ],
-  apple: { url: `${SITE_URL}/apple-touch-icon.png`, sizes: "180x180" },
-  shortcut: `${SITE_URL}/favicon.ico`,
+  apple: "/apple-touch-icon.png",
 },
 
     openGraph: {
@@ -211,7 +213,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   />
 
   {/* JSON-LD อื่น ๆ ของทุกหน้า */}
-  <AllPagesJsonLd />
+  {/* <AllPagesJsonLd /> */}
 </head>
 
       <body
