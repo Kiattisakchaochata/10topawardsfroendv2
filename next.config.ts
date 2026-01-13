@@ -6,6 +6,13 @@ const isDev = process.env.NODE_ENV !== "production";
 const nextConfig: NextConfig = {
   reactStrictMode: true,
 
+  // ✅ เพิ่มตรงนี้เท่านั้น
+  experimental: {
+    serverActions: {
+      allowedOrigins: ["10topawards.com", "www.10topawards.com"],
+    },
+  },
+
   images: {
     formats: ["image/avif", "image/webp"],
     remotePatterns: [
@@ -13,8 +20,6 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "www.10topawards.com" },
       { protocol: "https", hostname: "res.cloudinary.com" },
       { protocol: "https", hostname: "images.unsplash.com" },
-
-      // ✅ รูปจาก TikTok/YouTube/Google ที่ใช้จริง
       { protocol: "https", hostname: "**.tiktokcdn.com" },
       { protocol: "https", hostname: "**.tiktokcdn-us.com" },
       { protocol: "https", hostname: "i.ytimg.com" },

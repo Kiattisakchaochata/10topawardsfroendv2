@@ -15,3 +15,9 @@ html::-webkit-scrollbar,
 body::-webkit-scrollbar {
   display: none; /* Chrome, Safari */
 }
+/* กันคนแพ้ motion */
+@media (prefers-reduced-motion: reduce) {
+  .ta-featured-marquee {
+    animation: none;
+  }
+}

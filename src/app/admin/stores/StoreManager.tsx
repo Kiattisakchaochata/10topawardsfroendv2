@@ -25,6 +25,9 @@ type Store = {
   social_links?: string | null;
   is_active?: boolean | null;
   province?: string | null;
+  is_featured_home?: boolean | null;
+  featured_order?: number | null;
+  featured_until?: string | null;
 };
 
 /* ---------- UI helpers ---------- */
@@ -170,6 +173,10 @@ export default function StoreManager({
   const [rank, setRank] = useState<number | "">("");
   const [expired, setExpired] = useState<string>("");
   const dateRef = useRef<HTMLInputElement | null>(null);
+  // ✅ Featured (create) — ใช้ตอนสร้างเท่านั้น
+const [createFeatured, setCreateFeatured] = useState<boolean>(false);
+const [createFeaturedOrder, setCreateFeaturedOrder] = useState<number | "">("");
+const [createFeaturedUntil, setCreateFeaturedUntil] = useState<string>("");
   const coverRef = useRef<HTMLInputElement | null>(null);
   const fileRefs = useRef<HTMLInputElement[]>([]);
   const [extraFiles, setExtraFiles] = useState<(File | null)[]>([null, null, null, null, null]);
@@ -189,6 +196,10 @@ export default function StoreManager({
   const editCoverRef = useRef<HTMLInputElement | null>(null);
   const [editImageOrders, setEditImageOrders] = useState<Record<string, number>>({});
   const [editNewFiles, setEditNewFiles] = useState<FileList | null>(null);
+  // ✅ Featured (edit)
+const [editFeatured, setEditFeatured] = useState<boolean>(false);
+const [editFeaturedOrder, setEditFeaturedOrder] = useState<number | "">("");
+const [editFeaturedUntil, setEditFeaturedUntil] = useState<string>("");
 
   // Social (edit)
   const [editLine, setEditLine] = useState("");
@@ -241,6 +252,9 @@ export default function StoreManager({
     setExtraOrders([1,2,3,4,5]);
     setLineUrl(""); setFacebookUrl(""); setTiktokUrl(""); setInstagramUrl("");
     setMapUrl(""); 
+    setCreateFeatured(false);
+setCreateFeaturedOrder("");
+setCreateFeaturedUntil("");
     if (coverRef.current) coverRef.current.value = "";
     fileRefs.current.forEach(el => { if (el) el.value = ""; });
   }
@@ -262,7 +276,10 @@ export default function StoreManager({
       if (rank !== "") fd.append("order_number", String(rank));
       if (expired) fd.append("expired_at", expired);
       if (coverRef.current?.files?.[0]) fd.append("cover", coverRef.current.files[0]);
-
+// ✅ featured fields (create)
+fd.append("is_featured_home", createFeatured ? "true" : "false");
+fd.append("featured_order", createFeaturedOrder === "" ? "" : String(createFeaturedOrder));
+fd.append("featured_until", createFeaturedUntil || "");
       const soc: any = {};
 if (lineUrl.trim()) soc.line = lineUrl.trim();
 if (facebookUrl.trim()) soc.facebook = facebookUrl.trim();
@@ -302,6 +319,10 @@ if (Object.keys(soc).length) {
 function openEdit(s: Store) {
   setEditing(s);
   setEditOpen(true);
+  // ✅ set featured states
+setEditFeatured(Boolean(s.is_featured_home));
+setEditFeaturedOrder(typeof s.featured_order === "number" ? s.featured_order : "");
+setEditFeaturedUntil(s.featured_until ? String(s.featured_until).slice(0, 10) : "");
 
   // เตรียมลำดับรูป
   const o: Record<string, number> = {};
@@ -379,6 +400,10 @@ fd.append("social_links", JSON.stringify(soc));
           }
         }
       });
+      // ✅ featured fields
+fd.append("is_featured_home", editFeatured ? "true" : "false");
+fd.append("featured_order", editFeaturedOrder === "" ? "" : String(editFeaturedOrder));
+fd.append("featured_until", editFeaturedUntil || "");
 
       const r = await fetch(`${API_URL}/admin/stores/${editing.id}`, {
         method: "PATCH", credentials: "include", body: fd,
@@ -662,7 +687,63 @@ fd.append("social_links", JSON.stringify(soc));
               </select>
             </div>
           </div>
+{/* ✅ Premium / Featured */}
+<div className="rounded-xl border p-4 bg-slate-50">
+  <div className="flex items-center justify-between gap-3">
+    <div>
+      <div className="font-bold">ร้านพรีเมียม / รายปี</div>
+      <div className="text-xs text-slate-600">
+        ติ๊กเพื่อให้ร้านนี้ขึ้นหน้าแรกในหมวด “ร้านพรีเมียม”
+      </div>
+    </div>
 
+    <label className="flex items-center gap-2 text-sm font-medium">
+      <input
+        type="checkbox"
+        checked={createFeatured}
+onChange={(e) => {
+  const v = e.target.checked;
+  setCreateFeatured(v);
+  if (!v) {
+    setCreateFeaturedOrder("");
+    setCreateFeaturedUntil("");
+  }
+}}
+      />
+      เปิดใช้งาน
+    </label>
+  </div>
+
+  <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div>
+      <label className={labelCls()}>ลำดับแสดง (featured_order)</label>
+      <select
+        className={inputCls()}
+        value={createFeaturedOrder === "" ? "" : String(createFeaturedOrder)}
+onChange={(e) => setCreateFeaturedOrder(e.target.value === "" ? "" : Number(e.target.value))}
+disabled={!createFeatured}
+      >
+        <option value="">-</option>
+        {Array.from({ length: 50 }).map((_, i) => (
+          <option key={i + 1} value={i + 1}>{i + 1}</option>
+        ))}
+      </select>
+      <div className="text-xs text-slate-600 mt-1">ถ้าไม่ใส่ ระบบจะเรียงตาม created_at</div>
+    </div>
+
+    <div>
+      <label className={labelCls()}>วันหมดอายุพรีเมียม (featured_until)</label>
+      <input
+        type="date"
+        className={inputCls()}
+        value={createFeaturedUntil}
+onChange={(e) => setCreateFeaturedUntil(e.target.value)}
+disabled={!createFeatured}
+      />
+      <div className="text-xs text-slate-600 mt-1">ปล่อยว่าง = ไม่หมดอายุ</div>
+    </div>
+  </div>
+</div>
           <div>
             <label className={labelCls()}>ภาพหน้าปก (cover):</label>
             <div className="relative">
@@ -773,27 +854,37 @@ fd.append("social_links", JSON.stringify(soc));
             className="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100 hover:shadow-2xl transition-all duration-200"
           >
             {/* Cover */}
-            <div className="w-full aspect-[16/9] bg-gray-100 relative">
-              <img
-                src={s.cover_image || imgs[0]?.image_url || "/no-image.jpg"}
-                alt={s.name}
-                className="w-full h-full object-cover"
-              />
-              <div
-                className={`absolute left-3 top-3 rounded-full px-3 py-1 text-xs font-semibold shadow-md ${
-                  expired
-                    ? "bg-gray-700 text-white"
-                    : active
-                    ? "bg-emerald-600 text-white"
-                    : "bg-red-700 text-white"
-                }`}
-              >
-                {expired ? "Expired" : active ? "Active" : "Disabled"}
-              </div>
-            </div>
+<div className="w-full aspect-[16/9] bg-gray-100 relative">
+  <img
+    src={s.cover_image || imgs[0]?.image_url || "/no-image.jpg"}
+    alt={s.name}
+    className="w-full h-full object-cover"
+  />
 
-            {/* Content */}
-            <div className="p-5">
+  {/* ✅ Badges (top row) */}
+  <div className="absolute left-3 right-3 top-3 flex items-center justify-between gap-2">
+    <div
+      className={`rounded-full px-3 py-1 text-xs font-semibold shadow-md ${
+        expired
+          ? "bg-gray-700 text-white"
+          : active
+          ? "bg-emerald-600 text-white"
+          : "bg-red-700 text-white"
+      }`}
+    >
+      {expired ? "Expired" : active ? "Active" : "Disabled"}
+    </div>
+
+    {s.is_featured_home && (
+      <div className="rounded-full bg-yellow-500 text-black px-3 py-1 text-xs font-extrabold shadow">
+        ⭐ Premium
+      </div>
+    )}
+  </div>
+</div> {/* 🔥 ปิด Cover ที่ขาดอยู่ตรงนี้ */}
+
+/* Content */
+<div className="p-5">
               <div className="text-lg text-blue-950 font-semibold mb-3">{s.name}</div>
 
               {/* Thumbs + add button */}
@@ -933,6 +1024,65 @@ fd.append("social_links", JSON.stringify(soc));
                 <label className={labelCls()}>รายละเอียด</label>
                 <textarea className={inputCls()} rows={3} value={editing.description || ""} onChange={(e)=>setEditing({...editing, description: e.target.value})} />
               </div>
+              {/* ✅ Premium / Featured (EDIT) */}
+<div className="rounded-xl border p-4 bg-slate-50">
+  <div className="flex items-center justify-between gap-3">
+    <div>
+      <div className="font-bold">ร้านพรีเมียม / รายปี</div>
+      <div className="text-xs text-slate-600">
+        ติ๊กเพื่อให้ร้านนี้ขึ้นหน้าแรกในหมวด “ร้านพรีเมียม”
+      </div>
+    </div>
+
+    <label className="flex items-center gap-2 text-sm font-medium">
+      <input
+        type="checkbox"
+        checked={editFeatured}
+        onChange={(e) => {
+          const v = e.target.checked;
+          setEditFeatured(v);
+          if (!v) {
+            setEditFeaturedOrder("");
+            setEditFeaturedUntil("");
+          }
+        }}
+      />
+      เปิดใช้งาน
+    </label>
+  </div>
+
+  <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div>
+      <label className={labelCls()}>ลำดับแสดง (featured_order)</label>
+      <select
+        className={inputCls()}
+        value={editFeaturedOrder === "" ? "" : String(editFeaturedOrder)}
+        onChange={(e) =>
+          setEditFeaturedOrder(e.target.value === "" ? "" : Number(e.target.value))
+        }
+        disabled={!editFeatured}
+      >
+        <option value="">-</option>
+        {Array.from({ length: 50 }).map((_, i) => (
+          <option key={i + 1} value={i + 1}>{i + 1}</option>
+        ))}
+      </select>
+      <div className="text-xs text-slate-600 mt-1">ปล่อยว่าง = เรียงตาม created_at</div>
+    </div>
+
+    <div>
+      <label className={labelCls()}>วันหมดอายุพรีเมียม (featured_until)</label>
+      <input
+        type="date"
+        className={inputCls()}
+        value={editFeaturedUntil}
+        onChange={(e) => setEditFeaturedUntil(e.target.value)}
+        disabled={!editFeatured}
+      />
+      <div className="text-xs text-slate-600 mt-1">ปล่อยว่าง = ไม่หมดอายุ</div>
+    </div>
+  </div>
+</div>
 
               {/* Social (edit) */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

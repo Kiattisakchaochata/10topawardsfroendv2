@@ -37,9 +37,9 @@ function toKeywordArray(kw?: string | null): string[] | undefined {
 export async function generateMetadata({
   params,
 }: {
-  params: { slug?: string[] };
+  params: Promise<{ slug?: string[] }>;
 }) {
-  const slug = params.slug ?? [];
+  const { slug = [] } = await params;
   const seoPath = "/" + slug.join("/");
 
   const { site, page } = await buildSeoForPath(seoPath);
@@ -86,9 +86,9 @@ export async function generateMetadata({
 export default async function SeoPage({
   params,
 }: {
-  params: { slug?: string[] };
+  params: Promise<{ slug?: string[] }>;
 }) {
-  const slug = params.slug ?? [];
+  const { slug = [] } = await params;
   const seoPath = "/" + slug.join("/");
 
   const { site, page } = await buildSeoForPath(seoPath);
@@ -102,17 +102,13 @@ export default async function SeoPage({
   return (
     <>
       <Navbar />
-
-      {/* JSON-LD จาก API สำหรับ path ปัจจุบัน */}
       <SeoJsonLdFromApi path={seoPath} />
-
       <main className="container mx-auto max-w-5xl px-4 md:px-6 py-10 text-white">
         <h1 className="text-2xl font-semibold mb-2">{title}</h1>
-        { (page as any)?.description && (
+        {(page as any)?.description && (
           <p className="opacity-80">{(page as any).description}</p>
         )}
       </main>
-
       <Footer />
     </>
   );

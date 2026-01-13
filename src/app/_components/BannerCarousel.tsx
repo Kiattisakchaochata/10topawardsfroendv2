@@ -207,7 +207,7 @@ export default function BannerCarousel({
       ref={wrapRef}
       className={`
         relative overflow-hidden rounded-3xl
-        bg-[#0F172A] ring-1 ring-white/10
+        bg-[#0F172A]
         ${draggingRef.current ? "cursor-grabbing" : "cursor-grab"}
         select-none
         /* มือถือเลื่อนแนวตั้งได้ แต่ให้เราจัดการแนวนอนเอง */
@@ -221,8 +221,7 @@ export default function BannerCarousel({
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
     >
-      {/* เส้นกรอบทองแบบนุ่ม */}
-      <div className="pointer-events-none absolute inset-0 rounded-3xl ring-1 ring-[#D4AF37]/20" />
+      
 
       {/* เงาไล่จางซ้าย-ขวา */}
       <div className="pointer-events-none absolute inset-y-0 left-0 w-10 sm:w-24 bg-gradient-to-r from-[#0F172A] to-transparent opacity-70" />
@@ -230,56 +229,73 @@ export default function BannerCarousel({
 
       {/* แทร็ก */}
       <div
-        ref={trackRef}
-        className="flex py-3 sm:py-4 will-change-transform"
-        style={{ width: "max-content", contain: "content" }}
+  ref={trackRef}
+  className="flex py-0 px-2 sm:px-0 will-change-transform"
+  style={{ width: "max-content", contain: "content" }}
         onPointerEnter={() => (hoverRef.current = true)}
         onPointerLeave={() => (hoverRef.current = false)}
       >
         {loop.map((b, i) => {
           const content = (
-            <div
-              className="
-                group relative aspect-[16/9] shrink-0 overflow-hidden rounded-2xl
-                shadow-[0_8px_30px_rgba(0,0,0,.35)]
-                ring-1 ring-white/10 hover:ring-[#D4AF37]/40
-                transition-transform duration-300 group-hover:-translate-y-0.5
-                focus:outline-none
-                bg-slate-900/30
-              "
-              style={{
-                width: `${cardW}px`,
-                marginRight: `${gapW}px`,
-                backgroundImage: `url(${b.image_url})`,
-                backgroundSize: "cover",
-                backgroundPosition: "center",
-              }}
-              aria-label={b.title || b.alt_text || b.subtitle || b.genre || b.cta || ""}
-            >
-              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-black/10" />
+  <div
+    className="
+      group relative aspect-[16/9] shrink-0 overflow-hidden rounded-3xl
+      bg-white/5
+      shadow-[0_14px_50px_rgba(0,0,0,.45)]
+      transition-transform duration-300 hover:-translate-y-0.5
+    "
+    style={{ width: `${cardW}px`, marginRight: `${gapW}px` }}
+    aria-label={b.title || b.alt_text || ""}
+  >
+    {/* รูป */}
+    <img
+      src={b.image_url}
+      alt={b.alt_text || b.title || "banner"}
+      className="absolute inset-0 h-full w-full object-cover"
+      loading="lazy"
+      draggable={false}
+    />
 
-              {(b.genre || b.subtitle) && (
-                <div className="absolute left-3 top-3">
-                  <span className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-medium text-white/90 backdrop-blur-md ring-1 ring-white/20">
-                    {b.genre}
-                    {b.genre && b.subtitle && <span className="px-1">·</span>}
-                    {b.subtitle}
-                  </span>
-                </div>
-              )}
+    {/* overlay ทำให้ text อ่านง่าย */}
+    <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-black/25 to-black/10" />
 
-              {(b.title || b.alt_text) && (
-                <div className="absolute inset-x-3 bottom-3">
-                  <div className="relative overflow-hidden rounded-xl bg-white/10 p-2.5 sm:p-3 backdrop-blur-md ring-1 ring-white/20 shadow">
-                    <div className="text-[13px] sm:text-sm font-semibold text-white drop-shadow line-clamp-1">
-                      {b.title || b.alt_text}
-                    </div>
-                    <span className="pointer-events-none absolute inset-x-0 bottom-0 h-[2px] bg-gradient-to-r from-transparent via-[#D4AF37] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-                  </div>
-                </div>
-              )}
+    {/* มุมซ้ายบน: chip */}
+    {(b.genre || b.subtitle) && (
+      <div className="absolute left-3 top-3 z-10">
+        <span className="rounded-full bg-black/45 px-3 py-1 text-[11px] font-semibold text-white ring-1 ring-white/15 backdrop-blur">
+          {b.genre}
+          {b.genre && b.subtitle ? <span className="px-1 opacity-60">•</span> : null}
+          {b.subtitle}
+        </span>
+      </div>
+    )}
+
+    {/* มุมขวาบน: logo เล็ก */}
+    <div className="absolute right-3 top-3 z-10 rounded-full bg-white/90 px-2 py-1 text-[10px] font-extrabold text-black">
+      TopAward
+    </div>
+
+    {/* ด้านล่าง: title bar แบบ glass */}
+    {(b.title || b.alt_text) && (
+      <div className="absolute inset-x-3 bottom-3 z-10">
+        <div className="rounded-2xl bg-white/10 px-3 py-2.5 ring-1 ring-white/20 backdrop-blur">
+          <div className="line-clamp-1 text-sm font-extrabold text-white drop-shadow">
+            {b.title || b.alt_text}
+          </div>
+
+          {/* subtitle/cta ถ้ามี */}
+          {(b.cta || b.subtitle) && (
+            <div className="mt-0.5 line-clamp-1 text-[11px] text-white/80">
+              {b.cta || b.subtitle}
             </div>
-          );
+          )}
+
+          <div className="mt-2 h-[2px] w-full bg-gradient-to-r from-transparent via-[#D4AF37] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+        </div>
+      </div>
+    )}
+  </div>
+);
 
           return b.href ? (
             <a key={`${b.id}-${i}`} href={b.href} className="focus:outline-none focus:ring-2 focus:ring-amber-500 rounded-2xl">

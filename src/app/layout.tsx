@@ -9,6 +9,7 @@ import TrackingInjector from "./_components/TrackingInjector";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 
 
+
 /* ------------------------------ Font ------------------------------ */
 const notoThai = Noto_Sans_Thai({
   subsets: ["thai", "latin"],
@@ -62,7 +63,7 @@ async function fetchSeo(): Promise<PublicSiteSeo | null> {
     const res = await fetch(`${API_BASE}/api/public/seo/site`, {
       // ใน dev ใช้ no-store กัน cache เพี้ยน
       cache: "no-store",
-      next: { revalidate: 0 },
+      next: { revalidate: 300 },
     });
 
     // เจอ 404 หรือไม่ใช่ 2xx ให้เงียบ ๆ แล้วคืน null (ไม่ต้อง console.error รัว)

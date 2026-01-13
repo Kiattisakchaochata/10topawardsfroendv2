@@ -44,12 +44,10 @@ async function fetchJSON<T=any>(url: string, opts: FetchOpts = {}): Promise<{ok:
   const t = withTimeout(opts.timeoutMs ?? 2000);
   try {
     const res = await fetch(url, {
-      cache: 'no-store',
-      // @ts-ignore
-      next: { revalidate: 0 },
-      headers: { Accept: 'application/json', ...(opts.headers || {}) },
-      signal: t.signal,
-    });
+  next: { revalidate: 300 }, // cache SEO 5 นาที
+  headers: { Accept: 'application/json', ...(opts.headers || {}) },
+  signal: t.signal,
+});
     if (!res.ok) {
       // อ่าน body ไว้ debug เวลา dev
       if (process.env.NODE_ENV !== 'production') {

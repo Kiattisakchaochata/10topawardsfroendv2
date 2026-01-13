@@ -7,6 +7,7 @@ import { safeUrl } from "@/lib/safeUrl";
 import Navbar from "@/components/Navbar";
 import BannerCarousel from "./_components/BannerCarousel";
 import VideoStrip from "./_components/VideoStrip";
+import FeaturedStrip from "./_components/FeaturedStrip";
 import VisitPing from "@/components/VisitPing";
 
 /** ---------- THEME (premium) ---------- **/
@@ -40,6 +41,9 @@ type Store = {
   created_at?: string;
   avg_rating?: number;
   _reviewCount?: number;
+  is_featured_home?: boolean;
+  featured_order?: number | null;
+  featured_until?: string | null;
 };
 type Banner = {
   id: string;
@@ -121,14 +125,21 @@ async function getCategories(): Promise<Category[]> {
   }
 }
 
-async function getStores(): Promise<Store[]> {
+async function getStores(limit = 200): Promise<Store[]> {
   try {
-    const res = await fetch(`${API_URL}/stores`, {
+    const res = await fetch(`${API_URL}/stores?limit=${limit}`, {
       next: { revalidate: 300 },
     });
     if (!res.ok) return [];
+
     const data = await res.json();
-    const list: Store[] = data?.stores || data || [];
+
+    const list: Store[] =
+      data?.items ||
+      data?.stores ||
+      data?.data ||
+      (Array.isArray(data) ? data : []);
+
     return (list || []).filter((s) => s?.id);
   } catch {
     return [];
@@ -238,7 +249,25 @@ async function getPopularStores(limit = 12): Promise<Store[]> {
     )
     .slice(0, limit);
 }
+async function getFeaturedStores(limit = 12): Promise<Store[]> {
+  try {
+    const res = await fetch(`${API_URL}/stores/featured?limit=${limit}`, {
+      next: { revalidate: 300 },
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
 
+    const list: Store[] =
+      data?.stores ||
+      data?.items ||
+      data?.data ||
+      (Array.isArray(data) ? data : []);
+
+    return (list || []).filter((s) => s?.id);
+  } catch {
+    return [];
+  }
+}
 /** ⬇️ ดึงเฉพาะ active banners */
 async function getBanners(): Promise<Banner[]> {
   try {
@@ -304,15 +333,16 @@ const jsonSafe = (o: any, space: number = 2) =>
 
 /** ---------- Page ---------- **/
 export default async function HomePage() {
-  const [categories, storesAll, banners, popular, videos] = await Promise.all(
-    [
-      getCategories(),
-      getStores(),
-      getBanners(),
-      getPopularStores(12),
-      getVideos(12),
-    ]
-  );
+  const [categories, storesAll, banners, featured, popular, videos] =
+  await Promise.all([
+    getCategories(),
+    getStores(),
+    getBanners(),
+    getFeaturedStores(12), // ✅ เพิ่มอันนี้
+    getPopularStores(12),
+    getVideos(12),
+  ]);
+  console.log("storesAll length =", storesAll.length);
 
   const jar = await cookies();
   const loggedIn = Boolean(jar.get(AUTH_COOKIE)?.value);
@@ -326,7 +356,7 @@ export default async function HomePage() {
         new Date(b.created_at || 0).getTime() -
         new Date(a.created_at || 0).getTime()
     )
-    .slice(0, 4);
+    .slice(0, 12);
 
   const ldWebSite = {
     "@context": "https://schema.org",
@@ -420,10 +450,25 @@ export default async function HomePage() {
             <VideoStrip videos={videos} />
           </section>
         )}
+        {/* FEATURED (ร้านพรีเมียม / รายปี) */}
+{featured.length > 0 && (
+  <section className="relative mx-auto max-w-7xl px-4 pt-8 lg:max-w-8xl lg:px-6">
+    <div className="mb-4 flex items-center justify-between lg:mb-6">
+      <h2 className="text-2xl font-extrabold lg:text-3xl">
+        ร้าน <span className={THEME.accent}>แนะนำ</span>
+      </h2>
+
+      <Link href="/store?featured=1" className="text-sm lg:text-base hover:underline">
+        <span className={THEME.accent}>ดูทั้งหมด</span>
+      </Link>
+    </div>
+<FeaturedStrip stores={featured} />
+  </section>
+)}
 
         {/* CATEGORIES */}
         <section className="relative mx-auto max-w-7xl px-4 py-10 lg:max-w-8xl lg:px-6 lg:py-14">
-          <div className="mb-6 flex items-center justify_between lg:mb-8">
+          <div className="mb-6 flex w-full items-center justify-between lg:mb-8">
             <h2 className="text-2xl font-extrabold lg:text-3xl">
               หมวดหมู่ <span className={THEME.accent}>ยอดนิยม</span>
             </h2>
@@ -554,21 +599,18 @@ export default async function HomePage() {
                         />
                       </div>
                     </div>
-                    <div className="flex flex-1 flex-col justify-between p-4 lg:p-6">
-                      <div>
-                        <h3 className="line-clamp-1 text-lg font-extrabold text-white lg:text-xl">
-                          {store.name}
-                        </h3>
-                        {store.description && (
-                          <p className="mt-1 line-clamp-2 text-sm text-white/80 lg:text-base">
-                            {store.description}
-                          </p>
-                        )}
-                      </div>
-                      <div className="mt-3 whitespace-nowrap text-xs text-white/60 lg:mt-4 lg:text-sm">
-                        อัปเดต: {fmtTH(store.created_at)}
-                      </div>
-                    </div>
+                    <div className="flex flex-1 flex-col p-4 lg:p-6">
+  <div>
+    <h3 className="line-clamp-1 text-lg font-extrabold text-white lg:text-xl">
+      {store.name}
+    </h3>
+    {store.description && (
+      <p className="mt-1 line-clamp-2 text-sm text-white/80 lg:text-base">
+        {store.description}
+      </p>
+    )}
+  </div>
+</div>
                   </div>
                 </Link>
               ))}
