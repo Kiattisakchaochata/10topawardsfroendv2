@@ -30,9 +30,8 @@ type VisitorSummary = { total_visitors?: number; by_store?: VisitorByStore[] };
 type FeedbackRow = {
   store_id: string;
   store_name: string;
-  avg_food: number;
-  avg_service: number;
   total_feedback: number;
+  avg_score: number | null;
 };
 type Store = {
   id: string;
@@ -173,19 +172,15 @@ async function getVisitorSummary(): Promise<VisitorSummary> {
 async function getFeedbackSummary(): Promise<FeedbackRow[]> {
   try {
     const r = await fetchWithCookie("/admin/feedback/summary");
-    if (!r.ok) {
-      console.log("getFeedbackSummary !ok status =", r.status);
-      return [];
-    }
+    if (!r.ok) return [];
     const d = await r.json();
-    console.log("feedbackSummary raw =", d);
 
+    // รองรับได้หลายรูปแบบกันพัง
     if (Array.isArray(d)) return d;
     if (Array.isArray((d as any).rows)) return (d as any).rows;
     if (Array.isArray((d as any).summary)) return (d as any).summary;
     return [];
-  } catch (err) {
-    console.log("getFeedbackSummary error =", err);
+  } catch {
     return [];
   }
 }
@@ -196,16 +191,15 @@ export default async function AdminDashboardPage() {
     expiredRaw,
     users,
     visitorSummary,
-    feedbackRows,          // 👈 เพิ่มตัวนี้
+    feedbackRows,
   ] = await Promise.all([
     getCategories(),
     getActiveStores(),
     getExpiredStores(),
     getUsers(),
     getVisitorSummary(),
-    getFeedbackSummary(),  // 👈 ตัวที่ 6 จะถูกเก็บใน feedbackRows
+    getFeedbackSummary(),
   ]);
-
   const active = (activeRaw || []).map(normalizeStore);
   const expired = (expiredRaw || []).map(normalizeStore);
 
@@ -246,6 +240,7 @@ export default async function AdminDashboardPage() {
       created_at: prev.created_at || e.created_at || null,
     });
   }
+
   // 4) เติมชื่อถ้ายังว่าง
   for (const [id, s] of byId.entries()) {
     if (!s.name || !s.name.trim()) {
@@ -254,9 +249,13 @@ export default async function AdminDashboardPage() {
     }
   }
 
+  // ✅ stores ต้องประกาศครั้งเดียว
   const stores = Array.from(byId.values());
-  const validIds = new Set(stores.map(s => String(s.id)));
-const visitorsFiltered = byStoreRaw.filter(v => validIds.has(String(v.store_id)));
+
+  // visitor filter
+  const validIds = new Set(stores.map((s) => String(s.id)));
+  const visitorsFiltered = byStoreRaw.filter((v) => validIds.has(String(v.store_id)));
+
   const totalVisitors =
     (visitorSummary as any).total_visitors ??
     (visitorSummary as any).totalVisitors ??
@@ -265,7 +264,6 @@ const visitorsFiltered = byStoreRaw.filter(v => validIds.has(String(v.store_id))
 
   return (
     <div className={`relative min-h-screen ${THEME.pageBg} ${THEME.textMain}`}>
-      {/* premium radial lights */}
       <div
         className="pointer-events-none absolute inset-0 opacity-80"
         style={{ backgroundImage: THEME.pageFx }}
@@ -273,7 +271,6 @@ const visitorsFiltered = byStoreRaw.filter(v => validIds.has(String(v.store_id))
       />
 
       <div className="relative mx-auto max-w-7xl px-4 py-8 lg:px-6 lg:py-10">
-        {/* Header card */}
         <div className={`mb-6 rounded-3xl ${THEME.glass} px-6 py-6 shadow-2xl`}>
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -292,20 +289,19 @@ const visitorsFiltered = byStoreRaw.filter(v => validIds.has(String(v.store_id))
           </div>
         </div>
 
-        {/* Main card (contains DashboardClient) */}
         <div className={`rounded-3xl ${THEME.glass} p-5 md:p-6 lg:p-8 shadow-xl`}>
           <DashboardClient
-  summary={{
-    users: users.length,
-    categories: categories.length,
-    stores: stores.length,
-    visitors: Number(totalVisitors) || 0,
-  }}
-  visitorsByStore={visitorsFiltered}
-  stores={stores}
-  expiredFallback={Array.from(expiredMap.entries())}
-  feedbackSummary={feedbackRows}   // 👈 ส่งเข้าหน้า client
-/>
+            summary={{
+              users: users.length,
+              categories: categories.length,
+              stores: stores.length,
+              visitors: Number(totalVisitors) || 0,
+            }}
+            visitorsByStore={visitorsFiltered}
+            stores={stores}
+            expiredFallback={Array.from(expiredMap.entries())}
+            feedbackSummary={feedbackRows}
+          />
         </div>
       </div>
     </div>

@@ -1,6 +1,14 @@
 // src/app/admin/stores/StoreManager.tsx
 "use client";
-
+import {
+  Power,
+  Pencil,
+  QrCode,
+  MessageSquare,
+  Trash2,
+  X,
+  Save,
+} from "lucide-react";
 import { useMemo, useRef, useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { normalizeGoogleEmbed, extractIframeSrc } from "@/lib/googleMap";
@@ -28,22 +36,44 @@ type Store = {
   is_featured_home?: boolean | null;
   featured_order?: number | null;
   featured_until?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
 };
 
 /* ---------- UI helpers ---------- */
 function labelCls() { return "block text-sm font-medium mb-1"; }
 function inputCls() { return "w-full rounded-lg border px-3 py-2 outline-none focus:ring-2 focus:ring-yellow-600"; }
 
+const btnBase =
+  "cursor-pointer select-none inline-flex items-center justify-center gap-2 " +
+  "h-11 rounded-xl shadow transition-all duration-200 " +
+  "hover:scale-[1.03] active:scale-95 px-3";
+
+  const iconCircleBase =
+  "cursor-pointer select-none inline-flex items-center justify-center " +
+  "w-11 h-11 rounded-full shadow-sm transition-all duration-200 " +
+  "active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed " +
+  "focus:outline-none focus:ring-2 focus:ring-offset-2";
+
+const iconCircleNeutral =
+  `${iconCircleBase} bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:shadow-md hover:ring-2 hover:ring-slate-200`;
+
+const iconCirclePrimary =
+  `${iconCircleBase} bg-indigo-600 text-white hover:bg-indigo-700 hover:shadow-lg hover:ring-2 hover:ring-indigo-300`;
+
+const iconCircleDanger =
+  `${iconCircleBase} bg-rose-600 text-white hover:bg-rose-700 hover:shadow-lg hover:ring-2 hover:ring-rose-300`;
+
+const iconCircleSuccess =
+  `${iconCircleBase} bg-emerald-600 text-white hover:bg-emerald-700 hover:shadow-lg hover:ring-2 hover:ring-emerald-300`;
+
+const iconCircleDim =
+  `${iconCircleBase} bg-slate-700 text-white hover:bg-slate-800 hover:shadow-lg hover:ring-2 hover:ring-slate-300`;
 /* =========================================================
    Premium Modal System (UI only)
    ========================================================= */
 
 let LAST_CLICK: { x: number; y: number } | null = null;
-if (typeof window !== "undefined") {
-  window.addEventListener("pointerdown", (e) => {
-    LAST_CLICK = { x: e.clientX, y: e.clientY };
-  }, { capture: true });
-}
 
 let SCROLL_LOCKS = 0;
 let PREV_BODY_OVERFLOW = "";
@@ -142,8 +172,13 @@ function ConfirmModal({ open, title, message, onCancel, onConfirm, z = 10080 }:{
         <div className="text-lg font-bold mb-2">{title}</div>
         <div className="text-sm text-slate-700 mb-6">{message}</div>
         <div className="flex justify-end gap-3">
-          <button onClick={onCancel} className="rounded-lg border px-4 py-2">ยกเลิก</button>
-          <button onClick={onConfirm} className="rounded-lg bg-rose-600 hover:bg-rose-700 text-white px-4 py-2">ยืนยัน</button>
+          <button type="button" onClick={onCancel} className="rounded-lg border px-4 py-2">
+  ยกเลิก
+</button>
+
+<button type="button" onClick={onConfirm} className="rounded-lg bg-rose-600 hover:bg-rose-700 text-white px-4 py-2">
+  ยืนยัน
+</button>
         </div>
       </div>
     </Modal>
@@ -159,6 +194,20 @@ export default function StoreManager({
   const [cats] = useState<Category[]>(initialCategories || []);
   const [list, setList] = useState<Store[]>(initialStores || []);
 
+   // ✅ ติดตั้ง LAST_CLICK listener (กันซ้อนจาก Fast Refresh)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handler = (e: PointerEvent) => {
+      LAST_CLICK = { x: e.clientX, y: e.clientY };
+    };
+
+    window.addEventListener("pointerdown", handler, true);
+
+return () => {
+  window.removeEventListener("pointerdown", handler, true);
+};
+  }, []);
   // global states
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -188,6 +237,8 @@ const [createFeaturedUntil, setCreateFeaturedUntil] = useState<string>("");
   const [tiktokUrl, setTiktokUrl] = useState("");
   const [instagramUrl, setInstagramUrl] = useState("");
   const [mapUrl, setMapUrl] = useState("");          // ← create form
+  const [latitude, setLatitude] = useState<string>("");
+  const [longitude, setLongitude] = useState<string>("");
   const [editMap, setEditMap] = useState("");        // ← edit modal
 
   // edit modal states
@@ -206,6 +257,8 @@ const [editFeaturedUntil, setEditFeaturedUntil] = useState<string>("");
   const [editFacebook, setEditFacebook] = useState("");
   const [editTiktok, setEditTiktok] = useState("");
   const [editInstagram, setEditInstagram] = useState("");
+  const [editLat, setEditLat] = useState<string>("");
+  const [editLng, setEditLng] = useState<string>("");
 
   // local modal actions
   const [deleteStoreId, setDeleteStoreId] = useState<string | null>(null);
@@ -252,6 +305,8 @@ const [editFeaturedUntil, setEditFeaturedUntil] = useState<string>("");
     setExtraOrders([1,2,3,4,5]);
     setLineUrl(""); setFacebookUrl(""); setTiktokUrl(""); setInstagramUrl("");
     setMapUrl(""); 
+    setLatitude("");
+    setLongitude("");
     setCreateFeatured(false);
 setCreateFeaturedOrder("");
 setCreateFeaturedUntil("");
@@ -273,13 +328,15 @@ setCreateFeaturedUntil("");
       if (description.trim()) fd.append("description", description.trim());
       if (province.trim()) fd.append("province", province.trim());
       fd.append("category_id", categoryId);
+      if (latitude !== "") fd.append("latitude", latitude);
+      if (longitude !== "") fd.append("longitude", longitude);
       if (rank !== "") fd.append("order_number", String(rank));
       if (expired) fd.append("expired_at", expired);
       if (coverRef.current?.files?.[0]) fd.append("cover", coverRef.current.files[0]);
 // ✅ featured fields (create)
 fd.append("is_featured_home", createFeatured ? "true" : "false");
-fd.append("featured_order", createFeaturedOrder === "" ? "" : String(createFeaturedOrder));
-fd.append("featured_until", createFeaturedUntil || "");
+if (createFeatured && createFeaturedOrder !== "") fd.append("featured_order", String(createFeaturedOrder));
+if (createFeatured && createFeaturedUntil) fd.append("featured_until", createFeaturedUntil);
       const soc: any = {};
 if (lineUrl.trim()) soc.line = lineUrl.trim();
 if (facebookUrl.trim()) soc.facebook = facebookUrl.trim();
@@ -359,6 +416,8 @@ setEditFeaturedUntil(s.featured_until ? String(s.featured_until).slice(0, 10) : 
     "";
   const onlySrc = rawMap ? extractIframeSrc(String(rawMap)) : null;
   setEditMap((onlySrc || rawMap || "") as string);
+  setEditLat(s.latitude !== null && s.latitude !== undefined ? String(s.latitude) : "");
+setEditLng(s.longitude !== null && s.longitude !== undefined ? String(s.longitude) : "");
 }
 
   async function saveEdit() {
@@ -391,19 +450,18 @@ if (editMap.trim()) {
 }
 
 fd.append("social_links", JSON.stringify(soc));
+if (editLat !== "") fd.append("latitude", editLat);
+if (editLng !== "") fd.append("longitude", editLng);
 
-      (editing.images || []).forEach((im) => {
-        if (im.id) {
-          const n = editImageOrders[im.id];
-          if (typeof n === "number") {
-            fd.append("existing_image_orders", JSON.stringify({ id: im.id, order_number: n }));
-          }
-        }
-      });
+      const payload = (editing.images || [])
+  .filter((im) => im.id && typeof editImageOrders[im.id] === "number")
+  .map((im) => ({ id: im.id, order_number: editImageOrders[im.id] }));
+
+fd.append("existing_image_orders", JSON.stringify(payload));
       // ✅ featured fields
 fd.append("is_featured_home", editFeatured ? "true" : "false");
-fd.append("featured_order", editFeaturedOrder === "" ? "" : String(editFeaturedOrder));
-fd.append("featured_until", editFeaturedUntil || "");
+if (editFeatured && editFeaturedOrder !== "") fd.append("featured_order", String(editFeaturedOrder));
+if (editFeatured && editFeaturedUntil) fd.append("featured_until", editFeaturedUntil);
 
       const r = await fetch(`${API_URL}/admin/stores/${editing.id}`, {
         method: "PATCH", credentials: "include", body: fd,
@@ -526,32 +584,41 @@ fd.append("featured_until", editFeaturedUntil || "");
 
   /* ------- DELETE IMAGE (list & edit) ------- */
   async function doDeleteImage() {
-    if (!deleteImageId) return;
-    try {
-      setEditActionLoading({open:true, text:"กำลังลบรูปภาพ..."});
-      const r = await fetch(`${API_URL}/admin/stores/images/${deleteImageId}`, {
-        method: "DELETE", credentials: "include",
-      });
-      if (!r.ok) throw new Error("ลบรูปไม่สำเร็จ");
-      setDeleteImageId(null);
+  if (!deleteImageId) return;
+  const inEdit = editOpen && !!editing;
 
-      if (editOpen && editing) {
-        const detail = await fetch(`${API_URL}/admin/stores/${editing.id}`, { credentials:"include" });
-        const json = await detail.json();
-        setEditing(json);
-        const o: Record<string, number> = {};
-        (json.images || []).forEach((im: StoreImage) => { if (im.id) o[im.id] = im.order_number ?? 0; });
-        setEditImageOrders(o);
-      } else {
-        await refetch();
-      }
-      setSuccess({open:true,title:"สำเร็จ",message:"ลบรูปสำเร็จแล้ว"});
-    } catch (e:any) {
-      setError(e.message || "เกิดข้อผิดพลาด");
-    } finally {
-      setEditActionLoading({open:false, text:""});
+  try {
+    if (inEdit) setEditActionLoading({ open: true, text: "กำลังลบรูปภาพ..." });
+    else setLoading(true);
+
+    const r = await fetch(`${API_URL}/admin/stores/images/${deleteImageId}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    if (!r.ok) throw new Error("ลบรูปไม่สำเร็จ");
+
+    setDeleteImageId(null);
+
+    if (inEdit && editing) {
+      const detail = await fetch(`${API_URL}/admin/stores/${editing.id}`, { credentials: "include" });
+      const json = await detail.json();
+      setEditing(json);
+
+      const o: Record<string, number> = {};
+      (json.images || []).forEach((im: StoreImage) => { if (im.id) o[im.id] = im.order_number ?? 0; });
+      setEditImageOrders(o);
+    } else {
+      await refetch();
     }
+
+    setSuccess({ open: true, title: "สำเร็จ", message: "ลบรูปสำเร็จแล้ว" });
+  } catch (e: any) {
+    setError(e.message || "เกิดข้อผิดพลาด");
+  } finally {
+    if (inEdit) setEditActionLoading({ open: false, text: "" });
+    else setLoading(false);
   }
+}
 
   /* ------- UPLOAD IMAGES FROM LIST CARD ------- */
   async function uploadMoreImages(storeId: string, files: FileList | null) {
@@ -629,37 +696,67 @@ fd.append("featured_until", editFeaturedUntil || "");
           </div>
 
           {/* Social inputs */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div>
-              <label className={labelCls()}>LINE URL</label>
-              <input className={inputCls()} value={lineUrl} onChange={(e)=>setLineUrl(e.target.value)} placeholder="https://line.me/..." />
-            </div>
-            <div>
-              <label className={labelCls()}>Facebook URL</label>
-              <input className={inputCls()} value={facebookUrl} onChange={(e)=>setFacebookUrl(e.target.value)} placeholder="https://facebook.com/..." />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-3">
+<div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+  <div>
+    <label className={labelCls()}>LINE URL</label>
+    <input
+      className={inputCls()}
+      value={lineUrl}
+      onChange={(e) => setLineUrl(e.target.value)}
+      placeholder="https://line.me/..."
+    />
+  </div>
+
+  <div>
+    <label className={labelCls()}>Facebook URL</label>
+    <input
+      className={inputCls()}
+      value={facebookUrl}
+      onChange={(e) => setFacebookUrl(e.target.value)}
+      placeholder="https://facebook.com/..."
+    />
+  </div>
+
   <div>
     <label className={labelCls()}>TikTok URL</label>
-    <input className={inputCls()} value={tiktokUrl} onChange={(e)=>setTiktokUrl(e.target.value)} placeholder="https://www.tiktok.com/@..." />
+    <input
+      className={inputCls()}
+      value={tiktokUrl}
+      onChange={(e) => setTiktokUrl(e.target.value)}
+      placeholder="https://www.tiktok.com/@..."
+    />
   </div>
+
   <div>
     <label className={labelCls()}>Instagram URL</label>
-    <input className={inputCls()} value={instagramUrl} onChange={(e)=>setInstagramUrl(e.target.value)} placeholder="https://www.instagram.com/..." />
+    <input
+      className={inputCls()}
+      value={instagramUrl}
+      onChange={(e) => setInstagramUrl(e.target.value)}
+      placeholder="https://www.instagram.com/..."
+    />
+  </div>
+
+  <div className="md:col-span-2">
+    <label className={labelCls()}>Google Maps URL</label>
+    <input
+      className={inputCls()}
+      value={mapUrl}
+      onChange={(e) => setMapUrl(e.target.value)}
+      placeholder="https://maps.app.goo.gl/xxxxxxxx"
+    />
   </div>
 </div>
-{/* ⬇️ เพิ่มบล็อกนี้ */}
-<div className="mt-3">
-  <label className={labelCls()}>Google Maps URL</label>
-  <input
-    className={inputCls()}
-    value={mapUrl}
-    onChange={(e)=>setMapUrl(e.target.value)}
-    placeholder="https://maps.app.goo.gl/xxxxxxxx"
-  />
+<div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-3">
+  <div>
+    <label className={labelCls()}>Latitude</label>
+    <input className={inputCls()} value={latitude} onChange={(e)=>setLatitude(e.target.value)} placeholder="เช่น 12.5489788" />
+  </div>
+  <div>
+    <label className={labelCls()}>Longitude</label>
+    <input className={inputCls()} value={longitude} onChange={(e)=>setLongitude(e.target.value)} placeholder="เช่น 99.8003832" />
+  </div>
 </div>
-          </div>
-
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             <div>
               <label className={labelCls()}>หมวดหมู่:</label>
@@ -883,112 +980,143 @@ disabled={!createFeatured}
   </div>
 </div> {/* 🔥 ปิด Cover ที่ขาดอยู่ตรงนี้ */}
 
-/* Content */
+{/* Content */}
 <div className="p-5">
               <div className="text-lg text-blue-950 font-semibold mb-3">{s.name}</div>
 
-              {/* Thumbs + add button */}
-              <div className="flex items-center gap-2 mb-4 flex-wrap">
-                {imgs.slice(0,5).map(im=>(
-                  <div key={im.id} className="relative group">
-                    <img
-                      src={im.image_url}
-                      className="w-16 h-16 rounded-lg object-cover border shadow-sm"
-                      alt=""
-                    />
-                    <button
-                      onClick={()=>setDeleteImageId(im.id)}
-                      className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-red-600 text-white text-xs opacity-0 group-hover:opacity-100 transition"
-                      title="ลบรูปนี้"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-                {canAdd && (
-                  <div className="flex items-center gap-2">
-                    {Array.from({length: remaining}).map((_, idx) => (
-                      <label
-                        key={idx}
-                        className="w-16 h-16 border-2 border-dashed rounded-lg grid place-items-center cursor-pointer text-gray-400 hover:text-yellow-600 hover:border-yellow-600 transition"
-                      >
-                        <input
-  type="file"
-  accept="image/*"
-  className="hidden"
-  onChange={(e)=>{
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+              {/* Thumbs (fixed grid 5 slots) */}
+<div className="grid grid-cols-5 gap-2 mb-4">
+  {Array.from({ length: 5 }).map((_, i) => {
+    const im = imgs[i];
 
-    // ✅ ตรวจสอบทุกไฟล์ไม่เกิน 1MB
-    for (const f of files) {
-      if (f.size > 1024 * 1024) {
-        setError("ไฟล์เกิน 1MB กรุณาเลือกไฟล์ที่เล็กกว่า 1MB");
-        e.target.value = ""; // reset ค่า input
-        return;
-      }
+    // มีรูป
+    if (im) {
+      return (
+        <div
+  key={im.id}
+  className="relative group w-full aspect-square rounded-lg border shadow-sm p-1"
+>
+  {/* กล่องรูปด้านใน (เป็นตัวที่ crop รูปจริง) */}
+  <div className="relative w-full h-full overflow-hidden rounded-md">
+    <img src={im.image_url} alt="" className="w-full h-full object-cover" />
+  </div>
+
+  {/* ปุ่มลบ “ลอยนอกกรอบ” */}
+  <button
+    type="button"
+    onClick={() => setDeleteImageId(im.id)}
+    title="ลบรูปนี้"
+    className="
+      absolute -top-2 -right-2 z-10
+      w-7 h-7 rounded-full
+      bg-rose-600 text-white text-sm
+      grid place-items-center
+      shadow-lg ring-2 ring-white
+      opacity-0 group-hover:opacity-100 transition
+    "
+  >
+    ×
+  </button>
+</div>
+      );
     }
 
-    // ถ้าไฟล์ผ่านเงื่อนไข ส่งไป upload
-    uploadMoreImages(s.id, files);
-  }}
-/>
-                        +
-                      </label>
-                    ))}
-                  </div>
-                )}
-              </div>
+    // ช่องว่าง = ปุ่ม +
+    return (
+      <label
+        key={`empty-${i}`}
+        className="w-full aspect-square border-2 border-dashed rounded-lg grid place-items-center
+                   cursor-pointer text-gray-400 hover:text-yellow-600 hover:border-yellow-600 transition"
+        title="เพิ่มรูป"
+      >
+        <input
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => {
+            const files = e.target.files;
+            if (!files || files.length === 0) return;
 
-              <div className="text-sm text-gray-500 mb-3">ลำดับ: {showOrder(s)}</div>
+            for (const f of files) {
+              if (f.size > 1024 * 1024) {
+                setError("ไฟล์เกิน 1MB กรุณาเลือกไฟล์ที่เล็กกว่า 1MB");
+                e.target.value = "";
+                return;
+              }
+            }
 
-              {/* Action buttons */}
-              <div className="flex flex-wrap gap-2">
-                {expired ? (
-                  <button
-                    disabled
-                    className="rounded-xl bg-gray-400 text-white/90 px-4 py-2 cursor-not-allowed"
-                    title="ร้านหมดอายุแล้ว ต้องต่ออายุก่อน"
-                  >
-                    หมดอายุแล้ว
-                  </button>
-                ) : active ? (
-                  <button
-                    onClick={() => toggleActive(s, false)}
-                    className="rounded-xl bg-gradient-to-r from-slate-700 to-slate-800 hover:from-slate-800 hover:to-slate-900 text-white px-4 py-2 font-semibold shadow"
-                    title="ปิดการใช้งานร้านนี้"
-                  >
-                    Disable
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => toggleActive(s, true)}
-                    className="rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-700 hover:from-emerald-600 hover:to-emerald-800 text-white px-4 py-2 font-semibold shadow"
-                    title="เปิดใช้งานร้านนี้"
-                  >
-                    Enable
-                  </button>
-                )}
+            uploadMoreImages(s.id, files);
+            e.target.value = "";
+          }}
+        />
+        +
+      </label>
+    );
+  })}
+</div>
 
-                <button
-                  onClick={()=>openEdit(s)}
-                  className="rounded-xl bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white px-4 py-2 font-semibold shadow"
-                >
-                  แก้ไข
-                </button>
-                <Link
-  href={`/admin/stores/${s.id}/qr`}
-  className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 font-semibold shadow flex items-center justify-center"
->
-  QR
-</Link>
-                <button
-                  onClick={()=>setDeleteStoreId(s.id)}
-                  className="rounded-xl bg-gradient-to-r from-pink-500 to-pink-600 hover:from-pink-600 hover:to-pink-700 text-white px-4 py-2 font-semibold shadow"
-                >
-                  ลบ
-                </button>
-              </div>
+              {/* Action Bar (Premium style) */}
+<div className="mt-5 flex items-center justify-between">
+  
+  {/* Left: Order */}
+  <div className="text-xs text-gray-500">
+    ลำดับ: <span className="font-semibold">{showOrder(s)}</span>
+  </div>
+
+  {/* Right: Actions */}
+  <div className="flex items-center gap-2">
+    
+    {/* Enable / Disable */}
+    <button
+      onClick={() => toggleActive(s, !active)}
+      title={active ? "ปิดใช้งาน" : "เปิดใช้งาน"}
+      className={
+        active ? iconCircleDim : iconCircleSuccess
+      }
+    >
+      <Power size={18} />
+    </button>
+
+    {/* Edit */}
+    <button
+      onClick={() => openEdit(s)}
+      title="แก้ไข"
+      className={iconCirclePrimary}
+    >
+      <Pencil size={18} />
+    </button>
+
+    {/* QR */}
+    <Link
+      href={`/admin/stores/${s.id}/qr`}
+      title="QR Code"
+      className={iconCircleNeutral}
+    >
+      <QrCode size={18} />
+    </Link>
+
+    {/* Questions */}
+    <Link
+      href={`/admin/stores/${s.id}/feedback/questions`}
+      title="คำถาม"
+      className={iconCircleNeutral}
+    >
+      <MessageSquare size={18} />
+    </Link>
+
+    {/* Delete */}
+    <button
+      type="button"
+      onClick={() => setDeleteStoreId(s.id)}
+      title="ลบ"
+      className={iconCircleDanger}
+    >
+      <Trash2 size={18} />
+    </button>
+
+  </div>
+
+</div>
             </div>
           </div>
         );
@@ -1085,35 +1213,56 @@ disabled={!createFeatured}
 </div>
 
               {/* Social (edit) */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className={labelCls()}>LINE URL</label>
-                  <input className={inputCls()} value={editLine} onChange={(e)=>setEditLine(e.target.value)} />
-                </div>
-                <div>
-                  <label className={labelCls()}>Facebook URL</label>
-                  <input className={inputCls()} value={editFacebook} onChange={(e)=>setEditFacebook(e.target.value)} />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+  <div>
+    <label className={labelCls()}>LINE URL</label>
+    <input className={inputCls()} value={editLine} onChange={(e) => setEditLine(e.target.value)} />
+  </div>
+
+  <div>
+    <label className={labelCls()}>Facebook URL</label>
+    <input className={inputCls()} value={editFacebook} onChange={(e) => setEditFacebook(e.target.value)} />
+  </div>
+
   <div>
     <label className={labelCls()}>TikTok URL</label>
-    <input className={inputCls()} value={editTiktok} onChange={(e)=>setEditTiktok(e.target.value)} />
+    <input className={inputCls()} value={editTiktok} onChange={(e) => setEditTiktok(e.target.value)} />
   </div>
+
   <div>
     <label className={labelCls()}>Instagram URL</label>
-    <input className={inputCls()} value={editInstagram} onChange={(e)=>setEditInstagram(e.target.value)} />
+    <input className={inputCls()} value={editInstagram} onChange={(e) => setEditInstagram(e.target.value)} />
+  </div>
+
+  <div className="md:col-span-2">
+    <label className={labelCls()}>Google Maps URL</label>
+    <input
+      className={inputCls()}
+      value={editMap}
+      onChange={(e) => setEditMap(e.target.value)}
+      placeholder="https://maps.app.goo.gl/xxxxxxxx"
+    />
   </div>
 </div>
-</div>
-{/* ⬇️ เพิ่มบล็อกนี้ */}
-<div>
-  <label className={labelCls()}>Google Maps URL</label>
-  <input
-    className={inputCls()}
-    value={editMap}
-    onChange={(e)=>setEditMap(e.target.value)}
-    placeholder="https://maps.app.goo.gl/xxxxxxxx"
-  />
+<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+  <div>
+    <label className={labelCls()}>Latitude</label>
+    <input
+      className={inputCls()}
+      value={editLat}
+      onChange={(e) => setEditLat(e.target.value)}
+      placeholder="เช่น 12.5489788"
+    />
+  </div>
+  <div>
+    <label className={labelCls()}>Longitude</label>
+    <input
+      className={inputCls()}
+      value={editLng}
+      onChange={(e) => setEditLng(e.target.value)}
+      placeholder="เช่น 99.8003832"
+    />
+  </div>
 </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1155,23 +1304,26 @@ disabled={!createFeatured}
                 </span>
 
                 {expiredEditing ? (
-                  <button
-                    type="button"
-                    disabled
-                    className="ml-auto rounded bg-gray-500 text-white/80 px-3 py-2 cursor-not-allowed"
-                    title="ร้านหมดอายุแล้ว ต้องต่ออายุก่อน"
-                  >
-                    หมดอายุแล้ว
-                  </button>
-                ) : isStoreActive(editing) ? (
-                  <button type="button" onClick={() => toggleActive(editing, false)} className="ml-auto rounded bg-slate-700 hover:bg-slate-800 text-white px-3 py-2">
-                    Disable
-                  </button>
-                ) : (
-                  <button type="button" onClick={() => toggleActive(editing, true)} className="ml-auto rounded bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2">
-                    Enable
-                  </button>
-                )}
+  <button
+    type="button"
+    disabled
+    className={`${iconCircleDim} ml-auto opacity-60 cursor-not-allowed`}
+    title="ร้านหมดอายุแล้ว ต้องต่ออายุก่อน"
+    aria-label="หมดอายุแล้ว"
+  >
+    <Power size={20} />
+  </button>
+) : (
+  <button
+    type="button"
+    onClick={() => toggleActive(editing, !isStoreActive(editing))}
+    className={`${isStoreActive(editing) ? iconCircleDim : iconCircleSuccess} ml-auto`}
+    title={isStoreActive(editing) ? "ปิดใช้งาน" : "เปิดใช้งาน"}
+    aria-label={isStoreActive(editing) ? "Disable" : "Enable"}
+  >
+    <Power size={20} />
+  </button>
+)}
               </div>
 
               <div>
@@ -1204,7 +1356,16 @@ disabled={!createFeatured}
                         {Array.from({length:10}).map((_,i)=><option key={i+1} value={i+1}>{i+1}</option>)}
                       </select>
                       <span className="text-sm text-gray-600">ลำดับ</span>
-                      <button onClick={()=>setDeleteImageId(im.id)} className="ml-auto rounded bg-red-600 text-white px-3 py-1">ลบรูปนี้</button>
+                      <button
+  type="button"
+  onClick={() => setDeleteImageId(im.id)}
+  className={`${iconCircleDanger} ml-auto`}
+  title="ลบรูปนี้"
+  aria-label="ลบรูปนี้"
+  disabled={editActionLoading.open}
+>
+  <Trash2 size={20} />
+</button>
                     </div>
                   ))}
                 </div>
@@ -1247,17 +1408,53 @@ disabled={!createFeatured}
               </div>
             </div>
 
-            <div className="mt-5 flex justify-end gap-2">
-              <button onClick={()=>{ setEditOpen(false); setEditing(null); }} className="rounded-lg border px-4 py-2">ยกเลิก</button>
-              <button onClick={saveEdit} className="rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2">บันทึก</button>
-            </div>
+            <div className="mt-6 flex items-center justify-end gap-2">
+  {/* Cancel */}
+  <button
+    type="button"
+    onClick={() => { setEditOpen(false); setEditing(null); }}
+    className={iconCircleNeutral}
+    title="ยกเลิก"
+    aria-label="ยกเลิก"
+    disabled={editActionLoading.open}
+  >
+    <X size={20} />
+  </button>
+
+  {/* Save */}
+  <button
+    type="button"
+    onClick={saveEdit}
+    className={iconCirclePrimary}
+    title="บันทึก"
+    aria-label="บันทึก"
+    disabled={editActionLoading.open}
+  >
+    <Save size={20} />
+  </button>
+</div>
           </div>
         </Modal>
       )}
 
       {/* confirm delete store & image */}
-      <ConfirmModal open={!!deleteStoreId} title="ลบร้านค้า" message="ยืนยันการลบร้านนี้?" onCancel={()=>setDeleteStoreId(null)} onConfirm={doDeleteStore} z={11000} />
-      <ConfirmModal open={!!deleteImageId} title="ลบรูปภาพ" message="ยืนยันการลบรูปนี้?" onCancel={()=>setDeleteImageId(null)} onConfirm={doDeleteImage} z={11000} />
+<ConfirmModal
+  open={!!deleteStoreId}
+  title="ลบร้านค้า"
+  message="ยืนยันการลบร้านนี้?"
+  onCancel={() => setDeleteStoreId(null)}
+  onConfirm={doDeleteStore}
+  z={11000}
+/>
+
+<ConfirmModal
+  open={!!deleteImageId}
+  title="ลบรูปภาพ"
+  message="ยืนยันการลบรูปนี้?"
+  onCancel={() => setDeleteImageId(null)}
+  onConfirm={doDeleteImage}
+  z={11000}
+/>
     </>
   );
 }

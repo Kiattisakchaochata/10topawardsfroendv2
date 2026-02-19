@@ -2,9 +2,7 @@
 import { cookies } from "next/headers";
 import StoreManager from "./StoreManager";
 import ExpiryPanel from "./components/ExpiryPanel";
-import StoreFeedbackPanel from "@/components/admin/StoreFeedbackPanel";
-import StoreFeedbackQR from "@/components/admin/StoreFeedbackQR";
-
+import { FeedbackQuestionsPanel } from "@/components/admin/StoreFeedbackPanel";
 export const dynamic = "force-dynamic";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8899/api").replace(
@@ -96,18 +94,22 @@ export default async function AdminStoresPage() {
 
         {/* content */}
         <div className="grid gap-8">
-          {/* การ์ดจัดการร้าน */}
-          <div className={`rounded-3xl ${THEME.glass} p-5 md:p-6 lg:p-8 shadow-xl`}>
-            <StoreManager initialCategories={categories} initialStores={stores} />
-          </div>
+  {/* การ์ดจัดการร้าน */}
+  <div className={`rounded-3xl ${THEME.glass} p-5 md:p-6 lg:p-8 shadow-xl`}>
+    <StoreManager initialCategories={categories} initialStores={stores} />
+  </div>
 
-          {/* การ์ดร้านใกล้หมดอายุ */}
-          <div className={`rounded-3xl ${THEME.glass} p-5 md:p-6 lg:p-8 shadow-xl`}>
-            <ExpiryPanel />
-          </div>
+  {/* การ์ดร้านใกล้หมดอายุ */}
+  <div className={`rounded-3xl ${THEME.glass} p-5 md:p-6 lg:p-8 shadow-xl`}>
+    <ExpiryPanel />
+  </div>
 
-              <StoreFeedbackPanel stores={stores} />
-        </div>
+
+  {/* การ์ดชุดคำถาม (ของใหม่) */}
+  <div className={`rounded-3xl ${THEME.glass} p-5 md:p-6 lg:p-8 shadow-xl`}>
+    <FeedbackQuestionsPanel stores={stores.map((s) => ({ id: s.id, name: s.name }))} />
+  </div>
+</div>
       </div>
     </div>
   );

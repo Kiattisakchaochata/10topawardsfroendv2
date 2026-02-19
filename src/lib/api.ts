@@ -2,6 +2,26 @@
 
 // 🔧 คำนวณ BASE จากได้ทั้ง NEXT_PUBLIC_API_BASE และ NEXT_PUBLIC_API_URL
 function computeBase() {
+  // ✅ ฝั่ง Browser (Client)
+  // ถ้ามี NEXT_PUBLIC_API_BASE / NEXT_PUBLIC_API_URL ให้ยิงตรงไป backend ได้เลย (แก้ 404 ใน dev)
+  // ถ้าไม่มี env ค่อย fallback ไป /api (เหมาะกับ production ที่ reverse proxy)
+  if (typeof window !== 'undefined') {
+    const raw =
+      process.env.NEXT_PUBLIC_API_BASE ??
+      process.env.NEXT_PUBLIC_API_URL ??
+      '';
+
+    // ✅ รองรับทั้ง http(s)://... และ "//host" (กันเผลอใส่ protocol-relative)
+    if (raw && (/^https?:\/\//i.test(raw) || /^\/\//.test(raw))) {
+      let base = raw.replace(/\/$/, '');
+      if (!/\/api$/.test(base)) base += '/api';
+      return base;
+    }
+
+    return '/api';
+  }
+
+  // ✅ ฝั่ง Server (SSR / Route Handler)
   const raw =
     process.env.NEXT_PUBLIC_API_BASE ??
     process.env.NEXT_PUBLIC_API_URL ??
@@ -35,6 +55,7 @@ function getErrorMessage(data: unknown, fallback: string): string {
 function stripHtml(input: string): string {
   return input.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 }
+
 function normalizeErrorText(raw: string): string {
   const s = stripHtml(raw);
   if (/unique constraint failed/i.test(s) && /(stores_slug_key|slug)/i.test(s)) {
@@ -43,13 +64,20 @@ function normalizeErrorText(raw: string): string {
   return s;
 }
 
-export async function apiFetch<T = any>(path: string, opts: RequestInit = {}): Promise<T> {
+export async function apiFetch<T = any>(
+  path: string,
+  opts: RequestInit = {}
+): Promise<T> {
   const headers = new Headers(opts.headers || {});
   const token = getToken();
-  if (token && !headers.has('Authorization')) headers.set('Authorization', `Bearer ${token}`);
+  if (token && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
 
   let body = opts.body as any;
-  const isFormData = typeof FormData !== 'undefined' && body instanceof FormData;
+  const isFormData =
+    typeof FormData !== 'undefined' && body instanceof FormData;
+
   if (body && !isFormData && typeof body === 'object' && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
     body = JSON.stringify(body);
@@ -57,9 +85,16 @@ export async function apiFetch<T = any>(path: string, opts: RequestInit = {}): P
 
   // ✅ รองรับ absolute URL และไม่ต้องใส่ /api ตอนเรียก
   const isAbsolute = /^https?:\/\//i.test(path);
-  const url = isAbsolute ? path : `${API_BASE}/${String(path).replace(/^\/+/, '')}`;
+  const url = isAbsolute
+    ? path
+    : `${API_BASE}/${String(path).replace(/^\/+/, '')}`;
 
-  const res = await fetch(url, { ...opts, body, headers, credentials: 'include' });
+  const res = await fetch(url, {
+    ...opts,
+    body,
+    headers,
+    credentials: 'include',
+  });
 
   // 204/205 : ไม่มีเนื้อหา → คืน object เปล่า
   if (res.status === 204 || res.status === 205) {

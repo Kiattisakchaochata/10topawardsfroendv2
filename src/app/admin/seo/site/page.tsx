@@ -1,6 +1,6 @@
 // src/app/admin/seo/site/page.tsx
 'use client';
-
+import { Save } from 'lucide-react';
 export const dynamic = 'force-dynamic';
 
 import { Suspense, useEffect, useState } from 'react';
@@ -8,6 +8,16 @@ import { apiFetch } from '@/lib/api';
 import { Swal } from '@/lib/swal';
 import OgPicker4 from '@/components/admin/OgPicker4';
 
+/** ✅ Button theme: match /admin/videos (circle icon buttons with shadow + ring hover) */
+const iconCircleBase =
+  "cursor-pointer select-none inline-flex items-center justify-center " +
+  "w-11 h-11 rounded-full shadow-sm transition-all duration-200 " +
+  "active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed " +
+  "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-950";
+
+const iconCirclePrimary =
+  `${iconCircleBase} bg-indigo-600 text-white ` +
+  `hover:bg-indigo-700 hover:shadow-lg hover:ring-2 hover:ring-indigo-300`;
 const META_TITLE_MAX = 255;
 const META_DESC_MAX = 512;
 const KEYWORDS_MAX = 512;
@@ -497,15 +507,21 @@ function AdminSeoSitePageInner() {
             />
           </Field>
 
-          <div className="pt-2 flex justify-end">
-            <button
-              onClick={onSave}
-              disabled={loading}
-              className="rounded-full bg-amber-500 text-white px-6 py-2.5 font-semibold disabled:opacity-60"
-            >
-              {loading ? 'กำลังบันทึก…' : 'บันทึก'}
-            </button>
-          </div>
+          <div className="pt-2 flex items-center justify-end gap-3">
+  {/* optional text status */}
+  {loading ? <span className="text-sm text-slate-500">กำลังบันทึก…</span> : null}
+
+  <button
+    type="button"
+    onClick={onSave}
+    disabled={loading}
+    className={iconCirclePrimary}
+    title={loading ? "กำลังบันทึก..." : "บันทึก"}
+    aria-label="บันทึก"
+  >
+    <Save size={18} className={loading ? "opacity-60" : ""} />
+  </button>
+</div>
         </div>
       </section>
     </main>

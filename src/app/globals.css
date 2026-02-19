@@ -21,3 +21,20 @@ body::-webkit-scrollbar {
     animation: none;
   }
 }
+/* globals.css */
+@layer base {
+  /* ถ้าจะยิงเฉพาะ H1 ที่อยู่ใน section ตามชื่อ warning */
+  section h1 {
+    @apply text-2xl md:text-3xl font-extrabold;
+  }
+
+  /* หรือถ้าจะชัวร์ทั้งเว็บ (เลือกอย่างใดอย่างหนึ่งพอ) */
+  /* h1 { @apply text-2xl md:text-3xl font-extrabold; } */
+}
+/* ===== SweetAlert2 must be above our modal (z-[9999]) ===== */
+.swal2-container {
+  z-index: 20000 !important;
+}
+.swal-above-modal {
+  z-index: 20000 !important;
+}

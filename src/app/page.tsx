@@ -9,6 +9,7 @@ import BannerCarousel from "./_components/BannerCarousel";
 import VideoStrip from "./_components/VideoStrip";
 import FeaturedStrip from "./_components/FeaturedStrip";
 import VisitPing from "@/components/VisitPing";
+import LatestStoreCard from "./_components/LatestStoreCard";
 
 /** ---------- THEME (premium) ---------- **/
 const THEME = {
@@ -62,10 +63,17 @@ type Video = {
 };
 
 /** ---------- ENV ---------- **/
-const API_URL = (
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8899/api"
-).replace(/\/$/, "");
+// ให้เป็น "origin" ไม่มี /api เสมอ
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+
+// ตั้ง API_ORIGIN เป็นโดเมนล้วน (ไม่มี /api)
+const API_ORIGIN = (
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8899"
+).replace(/\/$/, "").replace(/\/api$/, "");
+
+// ต่อ /api ทีเดียว
+const API_URL = `${API_ORIGIN}/api`;
+
 const AUTH_COOKIE =
   process.env.AUTH_COOKIE_NAME ||
   process.env.NEXT_PUBLIC_AUTH_COOKIE ||
@@ -249,21 +257,64 @@ async function getPopularStores(limit = 12): Promise<Store[]> {
     )
     .slice(0, limit);
 }
-async function getFeaturedStores(limit = 12): Promise<Store[]> {
-  try {
-    const res = await fetch(`${API_URL}/stores/featured?limit=${limit}`, {
-      next: { revalidate: 300 },
-    });
-    if (!res.ok) return [];
-    const data = await res.json();
+async function getFeaturedStores(limit = 999): Promise<Store[]> {
+  // ✅ ขอเยอะไว้ก่อน กัน API ส่งไม่ครบ
+  const reqLimit = Math.max(limit, 500);
 
-    const list: Store[] =
-      data?.stores ||
+  const pick = (data: any): Store[] =>
+    (data?.stores ||
       data?.items ||
       data?.data ||
-      (Array.isArray(data) ? data : []);
+      (Array.isArray(data) ? data : [])) as Store[];
 
-    return (list || []).filter((s) => s?.id);
+  const onlyPremium = (list: Store[]) =>
+    (list || []).filter((s) => s?.id && s.is_active !== false && s.is_featured_home === true);
+
+  const dedupeSort = (list: Store[]) => {
+    const seen = new Set<string>();
+    const deduped = list.filter((s) => {
+      if (seen.has(s.id)) return false;
+      seen.add(s.id);
+      return true;
+    });
+
+    deduped.sort((a, b) => {
+      const ao = Number(a.featured_order ?? 999999);
+      const bo = Number(b.featured_order ?? 999999);
+      if (ao !== bo) return ao - bo;
+
+      const at = new Date(a.created_at || 0).getTime();
+      const bt = new Date(b.created_at || 0).getTime();
+      return bt - at;
+    });
+
+    return deduped;
+  };
+
+  try {
+    // 1) ลองดึงจาก endpoint featured ก่อน
+    const res = await fetch(`${API_URL}/stores/featured?limit=${reqLimit}`, {
+      cache: "no-store",
+      next: { revalidate: 0 },
+      headers: { "Cache-Control": "no-store" },
+    });
+
+    const data = res.ok ? await res.json() : null;
+    let premium = dedupeSort(onlyPremium(pick(data)));
+
+    // 2) ถ้ายังได้ไม่ครบ → fallback ดึงจาก stores ทั้งหมด แล้วกรอง premium เอง
+    if (premium.length < 1) {
+      const r2 = await fetch(`${API_URL}/stores?limit=${reqLimit}`, {
+        cache: "no-store",
+        next: { revalidate: 0 },
+        headers: { "Cache-Control": "no-store" },
+      });
+      const j2 = r2.ok ? await r2.json() : null;
+      premium = dedupeSort(onlyPremium(pick(j2)));
+    }
+
+    // ✅ คืน "ทั้งหมด" (ไม่ slice 12 ทิ้ง)
+    return premium;
   } catch {
     return [];
   }
@@ -309,18 +360,35 @@ async function getVideos(take = 12): Promise<Video[]> {
   }
 }
 
+// ✅ Cloudinary resize + auto format/quality (+ dpr_auto)
+function cld(url: string, w: number) {
+  if (!url?.includes("/image/upload/")) return url;
+
+  // g_auto = ครอปให้สวย, dpr_auto = รองรับจอ retina, c_fill = ตัดให้เต็มกรอบ
+  return url.replace(
+    "/image/upload/",
+    `/image/upload/f_auto,q_auto,dpr_auto,c_fill,g_auto,w_${w}/`
+  );
+}
+
 /** ---------- Utils ---------- **/
 const firstImage = (s: Store) =>
   safeUrl(
-    s.cover_image ||
-      s.images?.[0]?.image_url ||
-      "https://images.unsplash.com/photo-1526318472351-c75fcf070305?q=80&w=1200&auto=format&fit=crop"
+    cld(
+      s.cover_image ||
+        s.images?.[0]?.image_url ||
+        "https://images.unsplash.com/photo-1526318472351-c75fcf070305?q=80&w=1200&auto=format&fit=crop",
+      640 // ✅ ลดลง: Store card (Popular/Latest/Featured)
+    )
   );
 
 const catImage = (c: Category) =>
   safeUrl(
-    c.cover_image ||
-      "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?q=80&w=1200&auto=format&fit=crop"
+    cld(
+      c.cover_image ||
+        "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?q=80&w=1200&auto=format&fit=crop",
+      480 // ✅ ลดลง: Category card
+    )
   );
 
 const fmtTH = (iso?: string) =>
@@ -338,11 +406,10 @@ export default async function HomePage() {
     getCategories(),
     getStores(),
     getBanners(),
-    getFeaturedStores(12), // ✅ เพิ่มอันนี้
+    getFeaturedStores(999), // ✅ เพิ่มอันนี้
     getPopularStores(12),
     getVideos(12),
   ]);
-  console.log("storesAll length =", storesAll.length);
 
   const jar = await cookies();
   const loggedIn = Boolean(jar.get(AUTH_COOKIE)?.value);
@@ -356,7 +423,7 @@ export default async function HomePage() {
         new Date(b.created_at || 0).getTime() -
         new Date(a.created_at || 0).getTime()
     )
-    .slice(0, 12);
+    .slice(0, 20);
 
   const ldWebSite = {
     "@context": "https://schema.org",
@@ -440,7 +507,7 @@ export default async function HomePage() {
           <BannerCarousel
             banners={banners}
             cardWidth={560}
-            speedSec={50}
+            speedSec={120}
           />
         </section>
 
@@ -458,9 +525,9 @@ export default async function HomePage() {
         ร้าน <span className={THEME.accent}>แนะนำ</span>
       </h2>
 
-      <Link href="/store?featured=1" className="text-sm lg:text-base hover:underline">
-        <span className={THEME.accent}>ดูทั้งหมด</span>
-      </Link>
+      <Link href="/store?premium=1" className="text-sm lg:text-base hover:underline">
+  <span className={THEME.accent}>ดูทั้งหมด</span>
+</Link>
     </div>
 <FeaturedStrip stores={featured} />
   </section>
@@ -531,7 +598,7 @@ export default async function HomePage() {
             </div>
           ) : (
             <div className="no-scrollbar -mx-2 flex snap-x gap-4 overflow-x-auto px-2 pb-2 lg:gap-6 lg:pb-4">
-              {popular.map((s) => (
+              {popular.map((s, idx) => (
                 <Link
                   key={s.id}
                   href={`/store/${encodeURIComponent(String(s.id))}`}
@@ -539,14 +606,16 @@ export default async function HomePage() {
                 >
                   <div className="aspect-[16/9] overflow-hidden">
                     <img
-                      src={firstImage(s)}
-                      alt={s.name}
-                      className="h-full w-full object-cover transition duration-300 hover:scale-[1.04]"
-                      loading="lazy"
-                    />
+    src={firstImage(s)}
+    alt={s.name}
+    className="h-full w-full object-cover transition duration-300 hover:scale-[1.04]"
+    loading={idx === 0 ? "eager" : "lazy"}
+    fetchPriority={idx === 0 ? "high" : "auto"}
+    decoding="async"
+  />
                   </div>
                   <div className="p-4">
-                    <div className="mb-1 line-clamp-1 font-bold text_white">
+                    <div className="mb-1 line-clamp-1 font-bold text-white">
                       {s.name}
                     </div>
                     <div className="flex items-center gap-2 text-sm text-white/90">
@@ -582,39 +651,15 @@ export default async function HomePage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4 md:gap-6 lg:grid-cols-2">
-              {latestStores.map((store) => (
-                <Link
-                  key={store.id}
-                  href={`/store/${encodeURIComponent(String(store.id))}`}
-                  className={`group overflow-hidden rounded-2xl ${THEME.glass} shadow-sm transition hover:shadow-lg md:h-[260px]`}
-                >
-                  <div className="flex h-full flex-col md:flex-row">
-                    <div className="w-full shrink-0 md:w-[360px] xl:w-[400px]">
-                      <div className="h-[200px] md:h-full overflow-hidden">
-                        <img
-                          src={firstImage(store)}
-                          alt={store.name}
-                          className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
-                          loading="lazy"
-                        />
-                      </div>
-                    </div>
-                    <div className="flex flex-1 flex-col p-4 lg:p-6">
-  <div>
-    <h3 className="line-clamp-1 text-lg font-extrabold text-white lg:text-xl">
-      {store.name}
-    </h3>
-    {store.description && (
-      <p className="mt-1 line-clamp-2 text-sm text-white/80 lg:text-base">
-        {store.description}
-      </p>
-    )}
-  </div>
+  {latestStores.map((store) => (
+    <LatestStoreCard
+      key={store.id}
+      store={store}
+      href={`/store/${encodeURIComponent(String(store.id))}`}
+      imageUrl={firstImage(store)}
+    />
+  ))}
 </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
           )}
         </section>
       </div>

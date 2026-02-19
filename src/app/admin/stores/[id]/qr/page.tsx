@@ -105,14 +105,22 @@ export default async function StoreQRPage({ params }: PageProps) {
           </div>
 
           <div className="flex items-center gap-2">
-            <Link
-              href="/admin/stores"
-              className="rounded-lg bg-slate-800 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-700"
-            >
-              ← กลับหน้า Stores
-            </Link>
-            <PrintQRSheetButton />
-          </div>
+  <Link
+    href="/admin/stores"
+    className="rounded-lg bg-slate-800 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-700"
+  >
+    ← กลับหน้า Stores
+  </Link>
+
+  <Link
+    href={`/admin/stores/${id}/feedback/questions`}
+    className="rounded-lg border border-[#FFD700]/40 px-3 py-2 text-sm font-semibold text-[#FFD700] hover:bg-[#FFD700]/10"
+  >
+    จัดการคำถาม
+  </Link>
+
+  <PrintQRSheetButton />
+</div>
         </div>
 
         {/* แผ่นที่ใช้พิมพ์จริง */}

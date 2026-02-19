@@ -15,13 +15,16 @@ const EXPECT_HOST = (() => {
   }
 })();
 
-const CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!;
-const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET!;
+const CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
+const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || "";
 const API_BASE = (
   process.env.NEXT_PUBLIC_API_BASE ||
   process.env.NEXT_PUBLIC_API_URL ||
   "http://localhost:8899"
-).replace(/\/$/, "");
+)
+  .replace(/\/$/, "")
+  .replace(/\/api$/, ""); // ✅ กัน /api ซ้อน
+
 const OAUTH_BACKEND_ENDPOINT = `${API_BASE}/api/auth/oauth/google`;
 const AUTH_COOKIE_NAME = process.env.AUTH_COOKIE_NAME || "token";
 const IS_PROD = process.env.NODE_ENV === "production";
@@ -63,7 +66,7 @@ async function exchangeCodeForTokens(code: string) {
     let errJson: any = {};
     try {
       errJson = JSON.parse(text);
-    } catch {}
+    } catch { }
 
     console.error("❌ [callback] Google token exchange failed", {
       status: res.status,
@@ -130,13 +133,13 @@ async function verifyRecaptcha(token?: string, expectedAction?: string) {
     reason: ok
       ? undefined
       : `failed(${[
-          !success && "success",
-          !actionOk && `action:${json?.action}`,
-          !scoreOk && `score:${json?.score}`,
-          !hostOk && `host:${json?.hostname}`,
-        ]
-          .filter(Boolean)
-          .join(",")})`,
+        !success && "success",
+        !actionOk && `action:${json?.action}`,
+        !scoreOk && `score:${json?.score}`,
+        !hostOk && `host:${json?.hostname}`,
+      ]
+        .filter(Boolean)
+        .join(",")})`,
   };
 
   console.log("🔐 [callback] verifyRecaptcha result:", result);
@@ -148,6 +151,12 @@ async function verifyRecaptcha(token?: string, expectedAction?: string) {
 export async function POST(req: Request) {
   console.log("🚀 [/api/auth/google/callback] POST hit");
 
+  if (!CLIENT_ID || !CLIENT_SECRET) {
+    return NextResponse.json(
+      { ok: false, stage: "config", message: "Missing GOOGLE env (client id/secret)" },
+      { status: 500 }
+    );
+  }
   try {
     const body = await req.json().catch(() => ({} as any));
     const { code, recaptchaToken, action } = body || {};
@@ -193,8 +202,8 @@ export async function POST(req: Request) {
       tokenRes?.id_token
         ? { id_token: tokenRes.id_token }
         : tokenRes?.access_token
-        ? { access_token: tokenRes.access_token }
-        : {};
+          ? { access_token: tokenRes.access_token }
+          : {};
 
     console.log("ℹ️ [callback] payload to backend", {
       hasIdToken: !!(payload as any).id_token,

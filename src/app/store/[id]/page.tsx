@@ -1,7 +1,6 @@
 // src/app/store/[id]/page.tsx
-export const dynamic = "force-dynamic";
-export const fetchCache = "force-no-store";
-
+import type React from "react";
+import { buildStoreJsonLd } from "@/seo/jsonld";
 import type { Metadata } from "next";
 import Link from "next/link";
 import Script from "next/script";
@@ -14,10 +13,11 @@ import LiveRatingBadge from "@/components/LiveRatingBadge";
 import TikTokReload from "@/components/TikTokReload";
 import TrackingInjector from "@/app/_components/TrackingInjector";
 import { extractIframeSrc } from "@/lib/googleMap";
-
-// ✅ เพิ่มสองอันนี้
 import { fetchSiteSeo, fetchPageSeoByPath } from "@/seo/fetchers";
-import SeoJsonLdFromApi from "@/components/SeoJsonLdFromApi";
+
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
 
 /* ---------- types ---------- */
 type PageProps = { params: Promise<{ id: string }> };
@@ -44,7 +44,13 @@ type Store = {
   is_active?: boolean | number | string | null;
   expired_at?: string | null;
   created_at?: string;
-  category?: { id: string | number; name: string };
+  category?: { id: string | number; name: string; slug?: string | null };
+  province?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  phone?: string | null;
+  website?: string | null;
+
 };
 type Video = {
   id: string;
@@ -54,6 +60,38 @@ type Video = {
   thumbnail_url?: string | null;
   tiktok_embed_url?: string | null;
 };
+type FeedbackQuestion = {
+  key: string;
+  label: string;
+  type: string; // "STAR_1_5", "TEXT", ...
+  order_no?: number | null;
+};
+
+type FeedbackAnswer = {
+  id?: string;
+  value_number?: string | number | null;
+  value_text?: string | null;
+  question: FeedbackQuestion;
+};
+
+type StoreFeedback = {
+  id?: string;
+  comment?: string | null;
+  source?: string | null;
+  created_at?: string | null;
+  answers: FeedbackAnswer[];
+};
+
+type StoreFeedbackStats = {
+  count: number;
+  questions: Array<{
+    key: string;
+    label: string;
+    type: string;
+    avg?: number | null;
+    count?: number | null;
+  }>;
+};
 
 /* ---------- consts ---------- */
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8899/api").replace(/\/$/, "");
@@ -61,6 +99,27 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 const AUTH_COOKIE = process.env.AUTH_COOKIE_NAME || process.env.NEXT_PUBLIC_AUTH_COOKIE || "token";
 
 /* ---------- utils ---------- */
+function normalizeJsonLd(input: unknown) {
+  if (!input) return null;
+
+  // ถ้าเป็น string ที่เป็น JSON → parse
+  if (typeof input === "string") {
+    const s = input.trim();
+    if (!s) return null;
+    try {
+      return JSON.parse(s);
+    } catch {
+      // ถ้าเป็น string แต่ parse ไม่ได้ -> ไม่ฉีดดีกว่า (กันพัง)
+      return null;
+    }
+  }
+
+  // ถ้าเป็น object/array อยู่แล้ว ใช้ได้เลย
+  if (typeof input === "object") return input;
+
+  return null;
+}
+
 function isSafeStoreId(s: string) {
   return /^[A-Za-z0-9_-]+$/.test(s);
 }
@@ -70,11 +129,11 @@ function parseSocial(s?: unknown): Social {
     const obj: any = typeof s === "string" ? JSON.parse(s) : s;
 
     return {
-      line:       obj?.line || obj?.line_url || obj?.lineUrl || undefined,
-      facebook:   obj?.facebook || obj?.fb || obj?.facebook_url || obj?.facebookUrl || undefined,
-      tiktok:     obj?.tiktok || obj?.tik_tok || obj?.tiktok_url || obj?.tiktokUrl || undefined,
-      instagram:  obj?.instagram || obj?.ig || obj?.instagram_url || obj?.instagramUrl || undefined,
-      map:        obj?.map || obj?.gmap || obj?.googlemap || obj?.google_maps || undefined,
+      line: obj?.line || obj?.line_url || obj?.lineUrl || undefined,
+      facebook: obj?.facebook || obj?.fb || obj?.facebook_url || obj?.facebookUrl || undefined,
+      tiktok: obj?.tiktok || obj?.tik_tok || obj?.tiktok_url || obj?.tiktokUrl || undefined,
+      instagram: obj?.instagram || obj?.ig || obj?.instagram_url || obj?.instagramUrl || undefined,
+      map: obj?.map || obj?.gmap || obj?.googlemap || obj?.google_maps || undefined,
     };
   } catch {
     return {};
@@ -232,7 +291,7 @@ function buildMapsEmbedUrl(
         if (mid) {
           const ps = new URLSearchParams({ mid });
           const ll = u.searchParams.get("ll"); if (ll) ps.set("ll", ll);
-          const z  = u.searchParams.get("z");  if (z)  ps.set("z", z);
+          const z = u.searchParams.get("z"); if (z) ps.set("z", z);
           return `https://www.google.com/maps/d/embed?${ps.toString()}`;
         }
       }
@@ -264,7 +323,7 @@ function buildMapsEmbedUrl(
         if (q) return `https://www.google.com/maps?output=embed&q=${encodeURIComponent(q)}&z=16`;
       }
     }
-  } catch {}
+  } catch { }
   const q = address?.trim() || name?.trim();
   return q ? `https://www.google.com/maps?output=embed&q=${encodeURIComponent(q)}&z=16` : null;
 }
@@ -273,6 +332,30 @@ function buildMapsEmbedUrl(
 function toKeywordArray(kw?: string | null): string[] | undefined {
   if (!kw || !kw.trim()) return undefined;
   return kw.split(",").map((s) => s.trim()).filter(Boolean);
+}
+function buildPostalAddress(raw?: string | null, province?: string | null) {
+  const addr = (raw || "").trim();
+  if (!addr && !province) return undefined;
+
+  // ดึง locality แบบง่าย ๆ จาก address (ถ้ามีคำว่า อำเภอ/เขต/ตำบล/แขวง)
+  const pick = (re: RegExp) => {
+    const m = addr.match(re);
+    return m?.[1]?.trim() || undefined;
+  };
+
+  const locality =
+    pick(/อำเภอ\s*([^\s,]+)/) ||
+    pick(/เขต\s*([^\s,]+)/) ||
+    pick(/ตำบล\s*([^\s,]+)/) ||
+    pick(/แขวง\s*([^\s,]+)/);
+
+  return {
+    "@type": "PostalAddress",
+    streetAddress: addr || undefined,
+    addressLocality: locality,
+    addressRegion: province || undefined,
+    addressCountry: "TH",
+  };
 }
 
 /* ---------- data loaders ---------- */
@@ -336,7 +419,7 @@ async function getStoreVideos(storeId: string): Promise<Video[]> {
         }));
         return enriched.filter((v) => v.youtube_url || v.tiktok_embed_url);
       }
-    } catch {}
+    } catch { }
   }
   return [];
 }
@@ -358,12 +441,67 @@ async function getReviewStats(storeId: string): Promise<{ avg?: number; count: n
     return { avg: undefined, count: 0 };
   }
 }
+async function getFeedbackStats(storeId: string): Promise<StoreFeedbackStats> {
+  try {
+    const r = await fetch(
+      `${API_URL}/public/stores/${encodeURIComponent(storeId)}/feedback/stats`,
+      {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
+        next: { revalidate: 0 },
+      }
+    );
+
+    const j = await r.json().catch(() => ({}));
+    return {
+      count: Number(j?.count || 0),
+      questions: Array.isArray(j?.questions) ? j.questions : [],
+    };
+  } catch {
+    return { count: 0, questions: [] };
+  }
+}
+
+// ✅ โหลด feedback list (จาก QR)
+async function getFeedbackList(storeId: string): Promise<StoreFeedback[]> {
+  try {
+    const r = await fetch(
+      `${API_URL}/public/stores/${encodeURIComponent(storeId)}/feedback?take=20`,
+      {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
+        next: { revalidate: 0 },
+      }
+    );
+
+    const j = await r.json().catch(() => ({}));
+    const rows = (Array.isArray(j?.data) && j.data) || (Array.isArray(j) && j) || [];
+
+    // ✅ กันพัง + sort ตาม order_no
+    return (rows as any[]).map((item) => ({
+      id: item?.id,
+      comment: item?.comment ?? null,
+      source: item?.source ?? null,
+      created_at: item?.created_at ?? null,
+      answers: Array.isArray(item?.answers)
+        ? item.answers
+            .slice()
+            .sort(
+              (a: any, b: any) =>
+                Number(a?.question?.order_no ?? 999) - Number(b?.question?.order_no ?? 999)
+            )
+        : [],
+    })) as StoreFeedback[];
+  } catch {
+    return [];
+  }
+}
 
 /* ---------- SEO ---------- */
 export async function generateMetadata({ params }: MetadataProps): Promise<Metadata> {
   const { id: raw } = await params;
   const id = decodeURIComponent(String(raw || ""));
-  const path = `/store/${id}`;
+
 
   if (!isSafeStoreId(id)) {
     return {
@@ -374,12 +512,17 @@ export async function generateMetadata({ params }: MetadataProps): Promise<Metad
     };
   }
 
-  // ✅ ดึงทั้งข้อมูลร้าน + SEO ของ path นี้
-  const [store, siteSeo, pageSeo] = await Promise.all([
+  const pathExact = `/store/${id}`;
+  const pathTemplate = `/store/[id]`;
+
+  const [store, siteSeo, pageSeoExact, pageSeoTpl] = await Promise.all([
     getStore(id),
     fetchSiteSeo(),
-    fetchPageSeoByPath(path),
+    fetchPageSeoByPath(pathExact),
+    fetchPageSeoByPath(pathTemplate),
   ]);
+
+  const pageSeo = pageSeoExact || pageSeoTpl;
 
   if (!store || !isStoreEnabledPublic(store)) {
     return {
@@ -391,20 +534,26 @@ export async function generateMetadata({ params }: MetadataProps): Promise<Metad
   }
 
   const seoTitle = (pageSeo as any)?.title || null;
-  const seoDesc  = (pageSeo as any)?.description || null;
-  const seoKw    = (pageSeo as any)?.keywords ?? (siteSeo as any)?.keywords ?? null;
-  const seoOg    = (pageSeo as any)?.og_image || null;
+  const seoDesc = (pageSeo as any)?.description || null;
+  const seoOg = (pageSeo as any)?.og_image || null;
+
+  const seoKw =
+    (pageSeo as any)?.keywords ??
+    (siteSeo as any)?.keywords ??
+    null;
 
   const title = seoTitle || `${store.name} | TopAward`;
   const description =
     seoDesc ||
     store.description?.slice(0, 155) ||
     `รายละเอียดร้าน ${store.name} บน TopAward`;
+
   const url = `${SITE_URL}/store/${store.id}`;
   const ogImage = seoOg || store.cover_image || store.images?.[0]?.image_url || undefined;
   const keywords = toKeywordArray(seoKw);
 
   return {
+    metadataBase: new URL(SITE_URL),
     title,
     description,
     alternates: { canonical: url },
@@ -415,7 +564,13 @@ export async function generateMetadata({ params }: MetadataProps): Promise<Metad
       description,
       images: ogImage ? [{ url: ogImage }] : undefined,
     },
-    keywords, // ✅ meta keywords ต่อหน้าร้าน
+    twitter: {
+      card: ogImage ? "summary_large_image" : "summary",
+      title,
+      description,
+      images: ogImage ? [ogImage] : undefined,
+    },
+    keywords,
   };
 }
 
@@ -427,19 +582,45 @@ function StarGradient({ className = "" }: { className?: string }) {
     </span>
   );
 }
-
+function StarRow({ value, className = "" }: { value: number; className?: string }) {
+  const v = Math.max(0, Math.min(5, Math.round(Number(value) || 0)));
+  return (
+    <span className={`inline-flex items-center gap-0.5 leading-none ${className}`} aria-label={`${v} ดาว`}>
+      {Array.from({ length: 5 }).map((_, i) =>
+        i < v ? (
+          <StarGradient key={i} className="text-base" />
+        ) : (
+          <span key={i} className="text-white/25" aria-hidden>
+            ★
+          </span>
+        )
+      )}
+    </span>
+  );
+}
 /* ---------- Page ---------- */
 export default async function StoreDetailPage({ params }: PageProps) {
   const { id: raw } = await params;
   const id = decodeURIComponent(String(raw || ""));
   if (!isSafeStoreId(id)) notFound();
 
-  const [store, me, videos, stats] = await Promise.all([
-    getStore(id),
-    getMe(),
-    getStoreVideos(id),
-    getReviewStats(id),
-  ]);
+  const pathExact = `/store/${id}`;
+  const pathTemplate = `/store/[id]`;
+
+  const [store, me, videos, stats, fbStats, fbList, pageSeoExact, pageSeoTpl] = await Promise.all([
+  getStore(id),
+  getMe(),
+  getStoreVideos(id),
+  getReviewStats(id),
+  getFeedbackStats(id),
+  getFeedbackList(id),
+  fetchPageSeoByPath(pathExact),
+  fetchPageSeoByPath(pathTemplate),
+]);
+
+  const pageSeo = pageSeoExact || pageSeoTpl;
+  const apiJsonLd = normalizeJsonLd((pageSeo as any)?.jsonld);
+
   if (!store || !isStoreEnabledPublic(store)) notFound();
 
   const ratingCount = stats.count;
@@ -480,24 +661,42 @@ export default async function StoreDetailPage({ params }: PageProps) {
       { "@type": "ListItem", position: store.category?.id ? 4 : 3, name: store.name, item: `${SITE_URL}/store/${store.id}` },
     ],
   };
-  const ldLocalBusiness: any = {
-    "@context": "https://schema.org",
-    "@type": "LocalBusiness",
+  const ldLocalBusiness = buildStoreJsonLd({
+    id: store.id,
     name: store.name,
-    url: `${SITE_URL}/store/${store.id}`,
+
+    // slug ถ้าไม่มีใน store ก็ไม่ต้องส่ง
+    // slug: (store as any).slug,
+
     description: store.description || undefined,
-    image: images.length ? images : undefined,
     address: store.address || undefined,
-  };
-  if (ratingAvg && ratingCount) {
-    ldLocalBusiness.aggregateRating = {
-      "@type": "AggregateRating",
-      ratingValue: ratingAvg,
-      reviewCount: ratingCount,
-      bestRating: 5,
-      worstRating: 1,
-    };
-  }
+
+    phone: store.phone ?? null,
+    email: null,
+    website: store.website ?? null,
+
+    latitude: store.latitude ?? null,
+    longitude: store.longitude ?? null,
+
+    cover_image:
+      store.cover_image ||
+      (store.images?.[0]?.image_url ?? null),
+
+    // ให้ jsonld.ts เดาจาก category ได้
+    category_raw_slug: store.category?.slug ?? null,
+    category_name: store.category?.name ?? null,
+
+    social_links: {
+      facebook: social.facebook || "",
+      line: social.line || "",
+      instagram: social.instagram || "",
+      tiktok: social.tiktok || "",
+      map: social.map || "",
+    },
+
+    avg_rating: ratingAvg,
+    review_count: ratingCount,
+  });
 
   return (
     <>
@@ -506,24 +705,146 @@ export default async function StoreDetailPage({ params }: PageProps) {
       <TikTokReload storeId={store.id} />
 
       {/* ✅ JSON-LD จากระบบ SEO (Admin Page SEO) ตาม path /store/[id] */}
-      {/* @ts-expect-error Server Component */}
-      <SeoJsonLdFromApi path={`/store/${store.id}`} />
-
       <Script
         id="ld-breadcrumb-store"
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(ldBreadcrumb) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(ldBreadcrumb, null, 2) }}
       />
-      <Script
-        id="ld-localbusiness-store"
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(ldLocalBusiness) }}
-      />
+
+      {apiJsonLd ? (
+        <Script
+          id="ld-from-admin"
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(apiJsonLd, null, 2) }}
+        />
+      ) : (
+        <Script
+          id="ld-localbusiness-store"
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(ldLocalBusiness, null, 2) }}
+        />
+      )}
 
       {/* BG + content */}
       <div className="relative">
         <VisitPing kind="store" storeId={store.id} />
+        {/* ✅ Floating buttons (Home ซ้าย / Back ขวา) */}
+        <>
+          {/* Home (ซ้าย) */}
+          <Link
+            href="/"
+            className="
+    fixed left-4 bottom-5 z-[9998]
+    grid h-12 w-12 place-items-center rounded-full
+    bg-[#F9C525] text-white shadow-lg
+    ring-2 ring-white/80
+    opacity-65 blur-[0.6px] transition
+    hover:opacity-100 hover:blur-0 hover:scale-105
+    active:scale-95
+  "
+            aria-label="กลับหน้า Home"
+            title="Home"
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path
+                d="M3 10.5L12 3l9 7.5V21a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1v-10.5z"
+                fill="currentColor"
+              />
+            </svg>
+          </Link>
 
+          {/* Back (ขวา) */}
+          <button
+            type="button"
+            data-action="back"
+            className="
+    fixed right-4 bottom-5 z-[9998]
+    flex flex-col items-center justify-center gap-0.5
+    h-14 w-14 rounded-full
+
+    bg-[#F9C525] text-black
+    shadow-lg
+
+    /* state ปกติ */
+    opacity-40
+    blur-[0.6px]
+
+    /* transition */
+    transition-all duration-200 ease-out
+
+    /* hover */
+    hover:opacity-100
+    hover:blur-0
+    hover:scale-105
+    hover:shadow-xl
+
+    active:scale-95
+    cursor-pointer
+  "
+            aria-label="ย้อนกลับ"
+            title="ย้อนกลับ"
+          >
+            {/* Arrow */}
+            <svg
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="M10 6l-6 6 6 6"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M4 12h9a6 6 0 1 1 0 12"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+              />
+            </svg>
+
+            {/* Label */}
+            <span className="text-[10px] font-bold leading-none">
+              ย้อนกลับ
+            </span>
+          </button>
+        </>
+
+        {/* ✅ Back handler (history.back) */}
+        <Script
+          id="floating-back-handler"
+          strategy="afterInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+(function(){
+  // ✅ กัน bind ซ้ำเวลา hot reload / route change
+  if (window.__TA_BACK_BOUND__) return;
+  window.__TA_BACK_BOUND__ = true;
+
+  document.addEventListener('click', function(e){
+    var t = e.target && e.target.closest && e.target.closest('[data-action="back"]');
+    if (!t) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    try {
+      // ถ้าย้อน history ได้ → back
+      if (history.length > 1) history.back();
+      // ถ้าไม่มี history → ไปหมวดหมู่เป็น fallback
+      else location.href = '/category';
+    } catch(_) {
+      location.href = '/category';
+    }
+  }, true);
+})();
+`,
+          }}
+        />
         <div
           className="pointer-events-none absolute inset-0"
           aria-hidden
@@ -569,6 +890,9 @@ export default async function StoreDetailPage({ params }: PageProps) {
               <a href="#overview" className="rounded-full bg-white/10 px-3 py-1.5 text-sm text-white hover:bg-white/15">ภาพรวม</a>
               <a href="#videos" className="rounded-full bg-white/10 px-3 py-1.5 text-sm text-white hover:bg-white/15">วิดีโอ</a>
               <a href="#reviews" className="rounded-full bg-white/10 px-3 py-1.5 text-sm text-white hover:bg-white/15">รีวิว</a>
+              <a href="#feedback" className="rounded-full bg-white/10 px-3 py-1.5 text-sm text-white hover:bg-white/15">
+                Feedback
+              </a>
             </div>
           </div>
 
@@ -624,6 +948,98 @@ export default async function StoreDetailPage({ params }: PageProps) {
                   currentUserId={currentUserId}
                 />
               </section>
+              {/* ✅ Feedback (QR) */}
+<section id="feedback" className="rounded-2xl border border-white/10 bg-white/5 p-4 md:p-6">
+  <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+    <div>
+      <h2 className="text-xl font-bold text-white">Feedback จาก QR</h2>
+      <p className="text-sm text-white/70">ทั้งหมด {fbStats?.count || 0} รายการ</p>
+    </div>
+  </div>
+
+  {/* ✅ Summary ต่อคำถาม (จาก stats.questions) */}
+  {!!fbStats?.questions?.length && (
+    <div className="mt-4 grid gap-2 sm:grid-cols-2">
+      {fbStats.questions
+        .slice()
+        .sort((a, b) => (a?.count || 0) === (b?.count || 0) ? 0 : (b.count - a.count))
+        .map((q) => (
+          <div key={q.key} className="rounded-xl bg-black/20 p-3 ring-1 ring-white/10">
+            <div className="text-sm font-medium text-white/85">{q.label}</div>
+
+            {q.type === "STAR_1_5" ? (
+              <div className="mt-1 flex items-center gap-2">
+                <StarRow value={Number(q.avg || 0)} />
+                <span className="text-xs text-white/55">
+                  เฉลี่ย {Number(q.avg || 0).toFixed(1)} • {q.count} ครั้ง
+                </span>
+              </div>
+            ) : (
+              <div className="mt-1 text-xs text-white/55">
+                เฉลี่ย {q.avg != null ? Number(q.avg).toFixed(1) : "-"} • {q.count} ครั้ง
+              </div>
+            )}
+          </div>
+        ))}
+    </div>
+  )}
+
+  {/* ✅ รายการ feedback */}
+  <div className="mt-4 space-y-3">
+    {!fbList?.length ? (
+      <p className="text-sm text-slate-300">ยังไม่มี feedback</p>
+    ) : (
+      fbList.map((f, idx) => {
+        const answers = (f.answers || [])
+          .slice()
+          .sort((a, b) => (a.question.order_no ?? 999) - (b.question.order_no ?? 999));
+
+        return (
+          <div key={(f.id || "fb") + idx} className="rounded-xl bg-black/20 p-4 ring-1 ring-white/10">
+            <div className="flex flex-wrap items-center gap-2 text-sm text-white/80">
+              <span className="rounded-full bg-white/10 px-3 py-1 text-xs">{f.source || "QR"}</span>
+
+              {f.created_at && (
+                <span className="ml-auto text-xs text-white/50">
+                  {new Date(f.created_at).toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" })}
+                </span>
+              )}
+            </div>
+
+            {/* answers ตามคำถามจริง */}
+            {!!answers.length && (
+              <div className="mt-3 grid gap-2">
+                {answers.map((a) => (
+                  <div
+                    key={a.id}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white/5 px-3 py-2 ring-1 ring-white/10"
+                  >
+                    <div className="text-sm text-white/85">{a.question.label}</div>
+
+                    {a.question.type === "STAR_1_5" ? (
+                      <StarRow value={Number(a.value_number || 0)} />
+                    ) : (
+                      <div className="text-sm text-white/80">{a.value_text ?? a.value_number ?? "-"}</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* comment */}
+            <div className="mt-3">
+              {f.comment ? (
+                <p className="text-[15px] leading-6 text-white/85 whitespace-pre-line">{f.comment}</p>
+              ) : (
+                <p className="text-sm text-white/50">ไม่มีคอมเมนต์</p>
+              )}
+            </div>
+          </div>
+        );
+      })
+    )}
+  </div>
+</section>
             </div>
 
             {/* Right */}
@@ -639,7 +1055,7 @@ export default async function StoreDetailPage({ params }: PageProps) {
                     <dt className="w-24 shrink-0 text-white/60">โซเชียล</dt>
                     <dd className="flex-1">
                       {(() => {
-                        const chips: Array<JSX.Element> = [];
+                        const chips: React.ReactNode[] = [];
                         if (social.line)
                           chips.push(
                             <a
@@ -713,7 +1129,7 @@ export default async function StoreDetailPage({ params }: PageProps) {
                   const rawMap = social.map || undefined;
                   // ถ้าเป็น <iframe ...> ดึง src; ถ้าเป็นลิงก์ปกติ (เช่น https://maps.app.goo.gl/...) ใช้ตามนั้นเลย
                   const mapHref = rawMap
-                    ? (/<iframe/i.test(rawMap) ? extractIframeSrc(rawMap)! : rawMap)
+                    ? (/<iframe/i.test(rawMap) ? (extractIframeSrc(rawMap) || "") : rawMap)
                     : undefined;
 
                   const mapEmbed = buildMapsEmbedUrl(mapHref, store.address, store.name);
@@ -752,15 +1168,6 @@ export default async function StoreDetailPage({ params }: PageProps) {
                     </div>
                   );
                 })()}
-
-                <div className="mt-4">
-                  <Link
-                    href="/"
-                    className="inline-flex items-center justify-center rounded-lg px-4 py-2 font-semibold text:black bg-gradient-to-r from-[#FFD700] to-[#B8860B] hover:from-[#FFCC33] hover:to-[#FFD700] shadow-md transition"
-                  >
-                    ← กลับหน้าหลัก
-                  </Link>
-                </div>
               </div>
 
               {/* Videos */}
@@ -859,42 +1266,89 @@ export default async function StoreDetailPage({ params }: PageProps) {
         </div>
       </div>
 
-      {/* Lightbox */}
+      {/* Lightbox (Slider + Thumbnails) */}
       {images.length > 0 && (
         <>
           <div
             id="lb"
-            key={`lb-${store.id}`}
-            className="fixed inset-0 z-[9999] hidden items-center justify-center bg-black/80 p-4 backdrop-blur"
+            data-images={JSON.stringify(images)} // ✅ แหล่งรูปเดียวพอ
+            className="fixed inset-0 z-[9999] hidden bg-black/80 p-4 backdrop-blur"
             aria-modal="true"
             role="dialog"
           >
             <button
               id="lb-close"
-              className="fixed right-4 top-4 z-[10000] rounded-lg bg-white/10 px-3 py-2 text-sm text-white ring-1 ring-white/20 hover:bg-white/15"
+              className="fixed right-4 top-4 z-[10000] rounded-full bg-white/10 px-4 py-2 text-sm text-white ring-1 ring-white/20 hover:bg-white/15"
             >
               ปิด
             </button>
-            <div className="relative mx-auto flex max-w-[min(1100px,95vw)] flex-col">
-              <div className="flex items-center justify-center">
+
+            <div className="mx-auto flex h-full w-full max-w-[min(1200px,96vw)] flex-col">
+              <div className="relative flex flex-1 items-center justify-center">
                 <button
                   id="lb-prev"
-                  className="mr-3 hidden h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white ring-1 ring-white/20 hover:bg-white/15 md:flex"
+                  className="absolute left-2 z-[10000] hidden h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white ring-1 ring-white/20 hover:bg-white/15 md:flex pointer-events-auto cursor-pointer"
+                  aria-label="ก่อนหน้า"
                 >
-                  ‹
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
                 </button>
-                <div className="h-[min(85vh,720px)] w-[min(95vw,1100px)] overflow-hidden rounded-2xl ring-1 ring-white/15 bg-black/40">
-                  <img id="lb-img" alt="" className="h-full w-full object-contain" />
+
+                <div
+                  id="lb-stage"
+                  className="relative h-[min(78vh,760px)] w-[min(96vw,1200px)] overflow-hidden rounded-2xl ring-1 ring-white/15 bg-black/40"
+                >
+                  <img
+                    id="lb-img"
+                    alt=""
+                    className="h-full w-full object-contain select-none pointer-events-none"
+                    draggable="false"
+                  />
+
+                  <div className="pointer-events-none absolute left-3 top-3 rounded-full bg-black/55 px-3 py-1 text-xs text-white ring-1 ring-white/10">
+                    <span id="lb-count">1 / 1</span>
+                  </div>
                 </div>
+
                 <button
                   id="lb-next"
-                  className="ml-3 hidden h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white ring-1 ring-white/20 hover:bg-white/15 md:flex"
+                  className="absolute right-2 z-[10000] hidden h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white ring-1 ring-white/20 hover:bg-white/15 md:flex pointer-events-auto cursor-pointer"
+                  aria-label="ถัดไป"
                 >
-                  ›
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
                 </button>
+              </div>
+
+              <div className="mt-3">
+                <div
+                  id="lb-thumbs"
+                  className="lb-no-scroll no-scrollbar flex gap-2 overflow-x-auto pb-1"
+                  style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+                />
+                <div className="mt-2 h-px w-full bg-white/10" />
               </div>
             </div>
           </div>
+
+          {/* hide scrollbar */}
+          <Script
+            id="lb-thumbs-style"
+            strategy="afterInteractive"
+            dangerouslySetInnerHTML={{
+              __html: `
+(function(){
+  var s = document.getElementById('lb-thumbs-css');
+  if (s) return;
+  s = document.createElement('style');
+  s.id = 'lb-thumbs-css';
+  s.innerHTML = "#lb-thumbs::-webkit-scrollbar{display:none;width:0;height:0}";
+  document.head.appendChild(s);
+})();`,
+            }}
+          />
 
           <Script
             id="lb-controller"
@@ -903,39 +1357,174 @@ export default async function StoreDetailPage({ params }: PageProps) {
               __html: `
 (function () {
   var W = window, D = document;
-  if (W.__LB) return;
-  W.__LB = {
+  if (W.__LB2) return;
+
+  function qs(id){ return D.getElementById(id); }
+
+  W.__LB2 = {
     images: [],
     idx: 0,
-    q: function () { this.lb = D.getElementById('lb'); this.img = D.getElementById('lb-img'); },
-    show: function (i) { if (!this.images.length) return; this.idx = (i + this.images.length) % this.images.length; this.q(); if (this.img) { this.img.removeAttribute('src'); this.img.setAttribute('src', this.images[this.idx] || ""); } },
-    open: function (i) { this.q(); if (this.lb) this.lb.classList.remove('hidden'); this.show(typeof i === 'number' ? i : 0); },
-    close: function () { this.q(); if (this.lb) this.lb.classList.add('hidden'); },
-    bind: function () {
-      if (this.bound) return; this.bound = true;
-      D.addEventListener('click', (e) => { var t = e.target && e.target.closest && e.target.closest('[data-lb-open]'); if (!t) return; var i = Number(t.getAttribute('data-index') || '0'); this.open(isFinite(i) ? i : 0); });
-      D.addEventListener('click', (e) => { var id = (e.target && e.target.id) || ''; if (id === 'lb-prev') this.show(this.idx - 1); if (id === 'lb-next') this.show(this.idx + 1); if (id === 'lb-close') this.close(); });
-      D.addEventListener('keydown', (e) => { if (e.key === 'Escape') this.close(); if (e.key === 'ArrowLeft') this.show(this.idx - 1); if (e.key === 'ArrowRight') this.show(this.idx + 1); });
-      D.addEventListener('click', (e) => { var lb = D.getElementById('lb'); if (lb && e.target === lb) this.close(); });
+
+    q: function(){
+      this.lb = qs('lb');
+      this.img = qs('lb-img');
+      this.thumbs = qs('lb-thumbs');
+      this.count = qs('lb-count');
+    },
+
+    // ✅ อ่านรูปจาก DOM ทุกครั้ง กันค้างร้านเก่า
+    readImagesFromDom: function(){
+      this.q();
+      if (!this.lb) { this.images = []; return; }
+      try {
+        var raw = this.lb.getAttribute('data-images') || '[]';
+        this.images = JSON.parse(raw) || [];
+      } catch(_) {
+        this.images = [];
+      }
+    },
+
+    setCount: function(){
+      if (!this.count) return;
+      var total = this.images.length || 0;
+      this.count.textContent = (total ? (this.idx + 1) : 0) + ' / ' + total;
+    },
+
+    highlightThumb: function(){
+      if (!this.thumbs) return;
+      var kids = this.thumbs.children;
+      for (var i=0;i<kids.length;i++){
+        kids[i].classList.remove('ring-2','ring-amber-400','shadow-[0_0_0_2px_rgba(212,175,55,.55)]');
+        kids[i].classList.add('ring-1','ring-white/10');
+      }
+      var active = kids[this.idx];
+      if (active){
+        active.classList.remove('ring-1','ring-white/10');
+        active.classList.add('ring-2','ring-amber-400','shadow-[0_0_0_2px_rgba(212,175,55,.55)]');
+        try { active.scrollIntoView({behavior:'smooth', inline:'center', block:'nearest'}); } catch(_){}
+      }
+    },
+
+    renderThumbs: function(){
+      if (!this.thumbs) return;
+      this.thumbs.innerHTML = '';
+      var self = this;
+
+      this.images.forEach(function(src, i){
+        var btn = D.createElement('button');
+        btn.type = 'button';
+        btn.className = 'relative h-16 w-24 shrink-0 overflow-hidden rounded-lg ring-1 ring-white/10 bg-black/30';
+        btn.innerHTML = '<img src="'+ src +'" class="h-full w-full object-cover" loading="lazy" alt="" />';
+        btn.addEventListener('click', function(e){
+          e.preventDefault();
+          self.show(i);
+        });
+        self.thumbs.appendChild(btn);
+      });
+
+      this.highlightThumb();
+    },
+
+    show: function(i){
+      if (!this.images.length) return;
+      this.idx = (i + this.images.length) % this.images.length;
+      this.q();
+
+      if (this.img){
+        this.img.removeAttribute('src');
+        this.img.setAttribute('src', this.images[this.idx] || '');
+      }
+      this.setCount();
+      this.highlightThumb();
+    },
+
+    open: function(i){
+      this.readImagesFromDom();
+      if (!this.lb || !this.images.length) return;
+
+      this.lb.classList.remove('hidden');
+      this.renderThumbs();
+      this.show(typeof i === 'number' ? i : 0);
+    },
+
+    close: function(){
+      this.q();
+      if (this.lb) this.lb.classList.add('hidden');
+      this.idx = 0;
+      if (this.img) this.img.removeAttribute('src');
+      if (this.thumbs) this.thumbs.innerHTML = '';
+    },
+
+    bind: function(){
+      if (this.bound) return;
+      this.bound = true;
+      var self = this;
+
+      // open
+      D.addEventListener('click', function(e){
+        var t = e.target && e.target.closest && e.target.closest('[data-lb-open]');
+        if (!t) return;
+        e.preventDefault();
+        e.stopPropagation();
+        var i = Number(t.getAttribute('data-index') || '0');
+        self.open(isFinite(i) ? i : 0);
+      }, true);
+
+      // controls + backdrop
+      D.addEventListener('click', function(e){
+        var t = e.target;
+        var lb = qs('lb');
+        if (lb && t === lb) { e.preventDefault(); return self.close(); }
+
+        var prev = t && t.closest && t.closest('#lb-prev');
+        var next = t && t.closest && t.closest('#lb-next');
+        var close = t && t.closest && t.closest('#lb-close');
+
+        if (prev)  { e.preventDefault(); e.stopPropagation(); return self.show(self.idx - 1); }
+        if (next)  { e.preventDefault(); e.stopPropagation(); return self.show(self.idx + 1); }
+        if (close) { e.preventDefault(); e.stopPropagation(); return self.close(); }
+      }, true);
+
+      // keyboard
+      D.addEventListener('keydown', function(e){
+        if (!self.lb || self.lb.classList.contains('hidden')) return;
+        if (e.key === 'Escape') self.close();
+        if (e.key === 'ArrowLeft') self.show(self.idx - 1);
+        if (e.key === 'ArrowRight') self.show(self.idx + 1);
+      });
+
+      // swipe
+      var sx = 0, sy = 0, moved = false;
+      D.addEventListener('touchstart', function(e){
+        var lb = qs('lb');
+        if (!lb || lb.classList.contains('hidden')) return;
+        if (!e.touches || !e.touches[0]) return;
+        sx = e.touches[0].clientX;
+        sy = e.touches[0].clientY;
+        moved = false;
+      }, {passive:true});
+
+      D.addEventListener('touchmove', function(){
+        var lb = qs('lb');
+        if (!lb || lb.classList.contains('hidden')) return;
+        moved = true;
+      }, {passive:true});
+
+      D.addEventListener('touchend', function(e){
+        var lb = qs('lb');
+        if (!lb || lb.classList.contains('hidden')) return;
+        if (!moved || !e.changedTouches || !e.changedTouches[0]) return;
+        var dx = e.changedTouches[0].clientX - sx;
+        var dy = e.changedTouches[0].clientY - sy;
+        if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)){
+          if (dx < 0) self.show(self.idx + 1);
+          else self.show(self.idx - 1);
+        }
+      }, {passive:true});
     }
   };
-  W.__LB.bind();
-})();`,
-            }}
-          />
 
-          <Script
-            id={`lb-set-${store.id}`}
-            strategy="afterInteractive"
-            dangerouslySetInnerHTML={{
-              __html: `
-(function () {
-  if (window.__LB) {
-    window.__LB.images = [].concat(${JSON.stringify(images)});
-    window.__LB.idx = 0;
-    var imgEl = document.getElementById('lb-img');
-    if (imgEl) { imgEl.removeAttribute('src'); imgEl.setAttribute('src', ${JSON.stringify(images[0] || "")}); }
-  }
+  W.__LB2.bind();
 })();`,
             }}
           />

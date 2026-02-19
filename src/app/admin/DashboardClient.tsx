@@ -31,9 +31,8 @@ function addMonths(iso?: string | null, months = 0) {
 type FeedbackRow = {
   store_id: string;
   store_name: string;
-  avg_food: number;
-  avg_service: number;
   total_feedback: number;
+  avg_score?: number | null; // ✅ จาก API /admin/feedback/summary
 };
 
 function displayStoreName(s: Store) {
@@ -506,33 +505,31 @@ setLiveVisitorsTotal(total);
       <SectionBox title="รายงานการให้คะแนนของแต่ละร้าน">
         <DataTable className="min-w-[760px]">
           <thead>
-            <tr>
-              <Th>ชื่อร้าน</Th>
-              <Th className="text-right">เฉลี่ยรสชาติอาหาร</Th>
-              <Th className="text-right">เฉลี่ยการบริการ</Th>
-              <Th className="text-right">จำนวนครั้งที่ให้คะแนน</Th>
-            </tr>
-          </thead>
+  <tr>
+    <Th>ชื่อร้าน</Th>
+    <Th className="text-right">คะแนนเฉลี่ยรวม</Th>
+    <Th className="text-right">จำนวนครั้งที่ให้คะแนน</Th>
+  </tr>
+</thead>
           <tbody>
             {(!feedbackSummary || feedbackSummary.length === 0) ? (
-              <NoRow colSpan={4} text="ยังไม่มีข้อมูลการให้คะแนน" />
-            ) : (
+  <NoRow colSpan={3} text="ยังไม่มีข้อมูลการให้คะแนน" />
+) : (
               feedbackSummary.map((f) => (
-                <tr key={f.store_id} className="border-t hover:bg-slate-50/60">
-                  <Td className="text-slate-900">
-                    {f.store_name || "(ไม่ระบุชื่อ)"}
-                  </Td>
-                  <Td className="text-right">
-                    {f.avg_food.toFixed(1)} / 5
-                  </Td>
-                  <Td className="text-right">
-                    {f.avg_service.toFixed(1)} / 5
-                  </Td>
-                  <Td className="text-right">
-                    {f.total_feedback}
-                  </Td>
-                </tr>
-              ))
+  <tr key={f.store_id} className="border-t hover:bg-slate-50/60">
+    <Td className="text-slate-900">
+      {f.store_name || "(ไม่ระบุชื่อ)"}
+    </Td>
+
+    <Td className="text-right">
+      {Number.isFinite(Number(f.avg_score)) ? Number(f.avg_score).toFixed(2) : "-"} / 5
+    </Td>
+
+    <Td className="text-right">
+      {Number(f.total_feedback || 0)}
+    </Td>
+  </tr>
+))
             )}
           </tbody>
         </DataTable>

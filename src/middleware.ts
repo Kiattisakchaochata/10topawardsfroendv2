@@ -109,15 +109,25 @@ export async function middleware(req: NextRequest) {
   }
 
   // ----- ถ้า /login แต่มี token แล้ว -----
-  if (isLoginPage && token) {
-    const role = (await getRole(token)) || "user";
-    const url = req.nextUrl.clone();
+if (isLoginPage && token) {
+  const role = (await getRole(token)) || "user";
+  const url = req.nextUrl.clone();
+
+  const redirectTo = searchParams.get("redirect");
+
+  // ✅ ถ้ามี redirect และเป็น path ภายในเว็บ ให้กลับไปหน้านั้น
+  if (redirectTo && redirectTo.startsWith("/")) {
+    url.pathname = redirectTo;
+    url.search = ""; // กันค่ามั่ว
+  } else {
     url.pathname = role === "admin" ? "/admin" : "/";
-    url.search = searchParams.get("redirect") || "";
-    const res = NextResponse.redirect(url);
-    res.headers.set("X-Robots-Tag", "noindex, nofollow");
-    return res;
+    url.search = "";
   }
+
+  const res = NextResponse.redirect(url);
+  res.headers.set("X-Robots-Tag", "noindex, nofollow");
+  return res;
+}
 
   // ✅ แนบ x-pathname เพื่อให้ฝั่ง server อ่าน path ได้ (ใช้ใน layout.tsx)
   const reqHeaders = new Headers(req.headers);

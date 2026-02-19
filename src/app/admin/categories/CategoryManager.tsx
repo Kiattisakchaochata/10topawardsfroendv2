@@ -1,9 +1,11 @@
 "use client";
-
+import { Pencil, Trash2, RefreshCw, X, Save } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useConfirm } from "@/hooks/useConfirm";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
+
+
 
 /* ------------ Overlay + Modal + AlertModal ------------ */
 function BaseOverlay({ children, z = 10000 }: { children: React.ReactNode; z?: number }) {
@@ -49,10 +51,41 @@ function AlertModal({
 
 /** Normalize base URL */
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8899/api").replace(/\/$/, "");
+// --- Icon Button base (match videos page) ---
+const iconCircleBase =
+  "cursor-pointer select-none inline-flex items-center justify-center " +
+  "w-11 h-11 rounded-full shadow-sm transition-all duration-200 " +
+  "active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed " +
+  "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-950";
 
-/** ปุ่มทองแบบ premium */
+// --- Neutral (white hover ring + shadow) ---
+const iconBtn =
+  `${iconCircleBase} bg-white/5 border border-white/10 text-white ` +
+  `hover:bg-white/10 hover:shadow-md hover:ring-2 hover:ring-white/20`;
+
+// --- Primary (indigo hover ring + shadow) ---
+const iconBtnPrimary =
+  `${iconCircleBase} bg-indigo-600 text-white ` +
+  `hover:bg-indigo-700 hover:shadow-lg hover:ring-2 hover:ring-indigo-300`;
+
+// --- Danger (rose hover ring + shadow) ---
+const iconBtnDanger =
+  `${iconCircleBase} bg-rose-600 text-white ` +
+  `hover:bg-rose-700 hover:shadow-lg hover:ring-2 hover:ring-rose-300`;
+
+// --- Gold Button (cursor + disable cursor) ---
 const btnGold =
-  "bg-gradient-to-r from-[#FFD700] to-[#B8860B] text-black shadow-md hover:from-[#FFCC33] hover:to-[#FFD700] active:scale-[.98] transition";
+  "cursor-pointer bg-gradient-to-r from-[#FFD700] to-[#B8860B] text-black " +
+  "shadow-md transition active:scale-[.98] " +
+  "hover:from-[#FFCC33] hover:to-[#FFD700] " +
+  "disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100";
+
+// --- Ghost Button (for cancel/close) ---
+const btnGhost =
+  "cursor-pointer inline-flex items-center justify-center rounded-lg " +
+  "border border-white/10 bg-white/5 px-4 py-2 text-white " +
+  "transition hover:bg-white/10 active:scale-[.98] " +
+  "disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100";
 
 type Category = {
   id: string;
@@ -446,9 +479,9 @@ for (let i = 0; i < MAX_TRY; i++) {
         )}
 
         <div className="mt-4">
-          <button type="submit" disabled={loading} className={`rounded-lg px-4 py-2 ${btnGold} disabled:opacity-60`}>
-            {loading ? "กำลังเพิ่ม…" : "เพิ่มหมวดหมู่"}
-          </button>
+          <button type="submit" disabled={loading} className={`rounded-lg px-4 py-2 ${btnGold}`}>
+  {loading ? "กำลังเพิ่ม…" : "เพิ่มหมวดหมู่"}
+</button>
         </div>
       </form>
 
@@ -468,12 +501,14 @@ for (let i = 0; i < MAX_TRY; i++) {
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-white">รายการหมวดหมู่</h2>
           <button
-            onClick={refetch}
-            disabled={loading}
-            className="rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-sm text-white hover:bg-white/10 disabled:opacity-60"
-          >
-            รีเฟรช
-          </button>
+  onClick={refetch}
+  disabled={loading}
+  className={iconBtn}
+  title="รีเฟรช"
+  aria-label="รีเฟรช"
+>
+  <RefreshCw size={18} className={loading ? "animate-spin" : ""} />
+</button>
         </div>
 
         {filtered.length === 0 ? (
@@ -482,41 +517,52 @@ for (let i = 0; i < MAX_TRY; i++) {
           <div className="grid grid-cols-1 gap-4">
             {filtered.map((c) => (
               <div
-                key={c.id}
-                className="flex items-center gap-4 rounded-xl border border-white/10 bg-white/5 p-3 hover:bg-white/[0.07]"
-              >
-                <div className="h-16 w-28 shrink-0 overflow-hidden rounded bg-black/30 ring-1 ring-white/10">
-                  {c.cover_image ? (
-                    <img src={c.cover_image} alt={c.name} className="h-full w-full object-cover" loading="lazy" />
-                  ) : (
-                    <div className="grid h-full w-full place-items-center text-xs text-slate-400">ไม่มีรูป</div>
-                  )}
-                </div>
+  key={c.id}
+  className="flex items-center justify-between gap-4 rounded-xl border border-white/10 bg-white/5 p-3 hover:bg-white/[0.07]"
+>
+  {/* ซ้าย: รูป + ชื่อ (รวมกันเป็นกล่องเดียว) */}
+  <div className="flex items-center gap-4 min-w-0 flex-1">
+    <div className="h-16 w-28 shrink-0 overflow-hidden rounded bg-black/30 ring-1 ring-white/10">
+      {c.cover_image ? (
+        <img src={c.cover_image} alt={c.name} className="h-full w-full object-cover" loading="lazy" />
+      ) : (
+        <div className="grid h-full w-full place-items-center text-xs text-slate-400">ไม่มีรูป</div>
+      )}
+    </div>
 
-                <div className="min-w-0 flex-1">
-                  <div className="line-clamp-1 font-medium text-white">{c.name}</div>
-                  {c.created_at && (
-                    <div className="text-xs text-slate-400">
-                      อัปเดต: {new Date(c.created_at).toLocaleDateString("th-TH")}
-                    </div>
-                  )}
-                </div>
+    <div className="min-w-0">
+      <div className="line-clamp-1 font-medium text-white">{c.name}</div>
+      {c.created_at && (
+        <div className="text-xs text-slate-400">
+          อัปเดต: {new Date(c.created_at).toLocaleDateString("th-TH")}
+        </div>
+      )}
+    </div>
+  </div>
 
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => openEdit(c)}
-                    className="rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-sm text-white hover:bg-white/10"
-                  >
-                    แก้ไข
-                  </button>
-                  <button
-                    onClick={() => onDelete(c.id)}
-                    className="rounded-lg bg-rose-600 px-3 py-1 text-sm text-white hover:bg-rose-700"
-                  >
-                    ลบ
-                  </button>
-                </div>
-              </div>
+  {/* ขวา: ปุ่ม */}
+  <div className="flex items-center gap-2 shrink-0">
+  <button
+  type="button"
+  onClick={() => openEdit(c)}
+  className={iconBtnPrimary}
+  title="แก้ไข"
+  aria-label="แก้ไข"
+>
+  <Pencil size={18} />
+</button>
+
+  <button
+    type="button"
+    onClick={() => onDelete(c.id)}
+    className={iconBtnDanger}
+    title="ลบ"
+    aria-label="ลบ"
+  >
+    <Trash2 size={18} />
+  </button>
+</div>
+</div>
             ))}
           </div>
         )}
@@ -528,9 +574,6 @@ for (let i = 0; i < MAX_TRY; i++) {
           <div className="w-full max-w-lg rounded-2xl bg-slate-900/95 p-5 text-white ring-1 ring-white/10">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-lg font-semibold">แก้ไขหมวดหมู่</h3>
-              <button onClick={closeEdit} className="text-slate-300 hover:text-white text-sm">
-                ปิด
-              </button>
             </div>
 
             <form onSubmit={onUpdate}>
@@ -571,18 +614,30 @@ for (let i = 0; i < MAX_TRY; i++) {
                 </label>
               </div>
 
-              <div className="mt-5 flex items-center gap-3">
-                <button type="submit" disabled={loading} className={`rounded-lg px-4 py-2 ${btnGold} disabled:opacity-60`}>
-                  {loading ? "กำลังบันทึก…" : "บันทึกการแก้ไข"}
-                </button>
-                <button
-                  type="button"
-                  onClick={closeEdit}
-                  className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-white hover:bg-white/10"
-                >
-                  ยกเลิก
-                </button>
-              </div>
+              <div className="mt-5 flex items-center justify-end gap-3">
+  {/* Cancel */}
+  <button
+    type="button"
+    onClick={closeEdit}
+    className={iconBtn}
+    title="ยกเลิก"
+    aria-label="ยกเลิก"
+    disabled={loading}
+  >
+    <X size={18} />
+  </button>
+
+  {/* Save */}
+  <button
+    type="submit"
+    className={iconBtnPrimary}
+    title="บันทึก"
+    aria-label="บันทึก"
+    disabled={loading}
+  >
+    <Save size={18} className={loading ? "opacity-50" : ""} />
+  </button>
+</div>
             </form>
           </div>
         </div>

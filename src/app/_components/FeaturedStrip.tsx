@@ -36,7 +36,10 @@ export default function FeaturedStrip({
 }: Props) {
   if (!stores?.length) return null;
 
-  const base = useMemo(() => stores.filter((s) => s?.id), [stores]);
+  const base = useMemo(
+  () => stores.filter((s) => s?.id && s.is_featured_home === true),
+  [stores]
+);
   const loop = useMemo(() => [...base, ...base], [base]);
 
   const wrapRef = useRef<HTMLDivElement | null>(null);

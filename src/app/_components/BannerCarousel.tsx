@@ -2,13 +2,21 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
+/* ✅ เพิ่ม helper นี้ (ไม่กระทบส่วนอื่น) เพื่อย่อรูป Cloudinary + แปลงเป็น webp/avif อัตโนมัติ */
+function cld(url: string, w: number) {
+  if (!url?.includes("/image/upload/")) return url;
+  return url.replace(
+    "/image/upload/",
+    `/image/upload/f_auto,q_auto,c_fill,w_${w}/`
+  );
+}
+
 type Banner = {
   id: string;
   image_url: string;
   href?: string;
   title?: string | null;
   alt_text?: string | null;
-  logo_url?: string;
   cta?: string;
   genre?: string;
   subtitle?: string;
@@ -16,12 +24,9 @@ type Banner = {
 
 type Props = {
   banners: Banner[];
-  /** ความกว้างการ์ดสูงสุด (px) บนเดสก์ท็อป */
-  cardWidth?: number;   // default 560
-  /** เวลาเลื่อนครบ “ครึ่งเทป” (วิ) — ค่าน้อย = เร็ว */
-  speedSec?: number;    // default 24
-  /** ช่องว่างระหว่างการ์ด (px) เดสก์ท็อป */
-  gap?: number;         // default 16
+  cardWidth?: number; // default 560
+  speedSec?: number;  // default 24
+  gap?: number;       // default 16
 };
 
 export default function BannerCarousel({
@@ -32,13 +37,10 @@ export default function BannerCarousel({
 }: Props) {
   if (!banners || banners.length === 0) return null;
 
-  // ทำซ้ำ 2 ชุดเพื่อให้เลื่อนแบบไร้รอยต่อ
   const loop = useMemo(() => [...banners, ...banners], [banners]);
-
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
 
-  // === Responsive sizing ===
   const [cardW, setCardW] = useState(cardWidth);
   const [gapW, setGapW] = useState(gap);
 
@@ -47,15 +49,13 @@ export default function BannerCarousel({
     if (!wrap) return;
 
     const ro = new ResizeObserver(() => {
-      const wrapWidth = wrap.clientWidth;
+      const w = wrap.clientWidth;
+      const isMobile = w < 768;
 
-      // มือถือ: ให้การ์ด ~88–92% ของคอนเทนเนอร์ เพื่อให้เห็นการ์ดถัดไปเล็กน้อย
-      const isMobile = wrapWidth < 768;
-      const nextGap = isMobile ? 12 : gap;
-      const padding = isMobile ? 0 : 0;
+      const nextGap = isMobile ? 14 : gap;
 
-      // พยายามจำกัดการ์ดไม่ให้ใหญ่เกิน cardWidth เดิมบนเดสก์ท็อป
-      const mobileTarget = Math.max(240, Math.round(wrapWidth * 0.9) - padding);
+      // ✅ มือถือ: ให้เห็น “การ์ดถัดไป” นิดหน่อย และไม่สูงเกิน
+      const mobileTarget = Math.max(260, Math.round(w * 0.88));
       const nextCardW = isMobile ? Math.min(cardWidth, mobileTarget) : cardWidth;
 
       setCardW(nextCardW);
@@ -66,20 +66,18 @@ export default function BannerCarousel({
     return () => ro.disconnect();
   }, [cardWidth, gap]);
 
-  // raf states
   const xRef = useRef(0);
   const hoverRef = useRef(false);
   const velRef = useRef(0);
 
-  // drag states
   const draggingRef = useRef(false);
   const dragStartXRef = useRef(0);
   const dragBaseXRef = useRef(0);
   const lastMoveXRef = useRef(0);
   const lastMoveTRef = useRef(0);
+
   const [half, setHalf] = useState(0);
 
-  // แคชครึ่งความกว้างเทป
   useEffect(() => {
     const track = trackRef.current;
     if (!track) return;
@@ -89,7 +87,6 @@ export default function BannerCarousel({
     return () => ro.disconnect();
   }, [loop.length, cardW, gapW]);
 
-  // normalize ตำแหน่ง
   const normalize = (x: number) => {
     if (half === 0) return x;
     while (x <= -half) x += half;
@@ -97,7 +94,6 @@ export default function BannerCarousel({
     return x;
   };
 
-  // animation
   useEffect(() => {
     const track = trackRef.current;
     if (!track || half === 0) return;
@@ -117,8 +113,7 @@ export default function BannerCarousel({
 
       if (!draggingRef.current && Math.abs(velRef.current) > 1) {
         xRef.current += velRef.current * dt;
-        const friction = 0.92;
-        velRef.current *= friction ** (dt * 60);
+        velRef.current *= 0.92 ** (dt * 60);
       } else if (draggingRef.current) {
         velRef.current = 0;
       }
@@ -131,7 +126,6 @@ export default function BannerCarousel({
     return () => cancelAnimationFrame(raf);
   }, [half, speedSec]);
 
-  // ---- Drag handlers (pointer events) ----
   const threshold = 5;
   const movedRef = useRef(0);
 
@@ -151,16 +145,15 @@ export default function BannerCarousel({
 
   const onPointerMove = (e: React.PointerEvent) => {
     if (!draggingRef.current) return;
+
     const dx = e.clientX - dragStartXRef.current;
     movedRef.current = Math.max(movedRef.current, Math.abs(dx));
     xRef.current = normalize(dragBaseXRef.current + dx);
 
     const now = performance.now();
     const dt = (now - lastMoveTRef.current) / 1000;
-    if (dt > 0) {
-      const vx = (e.clientX - lastMoveXRef.current) / dt;
-      velRef.current = vx;
-    }
+    if (dt > 0) velRef.current = (e.clientX - lastMoveXRef.current) / dt;
+
     lastMoveXRef.current = e.clientX;
     lastMoveTRef.current = now;
 
@@ -173,7 +166,9 @@ export default function BannerCarousel({
   const onPointerUp = (e: React.PointerEvent) => {
     const wrap = wrapRef.current;
     if (wrap) {
-      try { wrap.releasePointerCapture?.(e.pointerId); } catch {}
+      try {
+        wrap.releasePointerCapture?.(e.pointerId);
+      } catch {}
     }
     draggingRef.current = false;
 
@@ -193,27 +188,28 @@ export default function BannerCarousel({
         }, 0);
       }
     }
+
     setTimeout(() => (hoverRef.current = false), 80);
   };
 
   const onPointerCancel = (e: React.PointerEvent) => {
     draggingRef.current = false;
     hoverRef.current = false;
-    try { wrapRef.current?.releasePointerCapture?.(e.pointerId); } catch {}
+    try {
+      wrapRef.current?.releasePointerCapture?.(e.pointerId);
+    } catch {}
   };
 
   return (
     <div
       ref={wrapRef}
-      className={`
-        relative overflow-hidden rounded-3xl
-        bg-[#0F172A]
-        ${draggingRef.current ? "cursor-grabbing" : "cursor-grab"}
-        select-none
-        /* มือถือเลื่อนแนวตั้งได้ แต่ให้เราจัดการแนวนอนเอง */
-        touch-pan-y
-        px-2 sm:px-0
-      `}
+      className={[
+        "relative overflow-hidden rounded-3xl",
+        "bg-[#0F172A]",
+        draggingRef.current ? "cursor-grabbing" : "cursor-grab",
+        "select-none touch-pan-y",
+        "px-2 sm:px-0",
+      ].join(" ")}
       onPointerEnter={() => (hoverRef.current = true)}
       onPointerLeave={() => (hoverRef.current = false)}
       onPointerDown={onPointerDown}
@@ -221,88 +217,91 @@ export default function BannerCarousel({
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
     >
-      
+      {/* fade edges */}
+      <div className="pointer-events-none absolute inset-y-0 left-0 w-10 sm:w-24 bg-gradient-to-r from-[#0F172A] to-transparent opacity-80" />
+      <div className="pointer-events-none absolute inset-y-0 right-0 w-10 sm:w-24 bg-gradient-to-l from-[#0F172A] to-transparent opacity-80" />
 
-      {/* เงาไล่จางซ้าย-ขวา */}
-      <div className="pointer-events-none absolute inset-y-0 left-0 w-10 sm:w-24 bg-gradient-to-r from-[#0F172A] to-transparent opacity-70" />
-      <div className="pointer-events-none absolute inset-y-0 right-0 w-10 sm:w-24 bg-gradient-to-l from-[#0F172A] to-transparent opacity-70" />
-
-      {/* แทร็ก */}
       <div
-  ref={trackRef}
-  className="flex py-0 px-2 sm:px-0 will-change-transform"
-  style={{ width: "max-content", contain: "content" }}
-        onPointerEnter={() => (hoverRef.current = true)}
-        onPointerLeave={() => (hoverRef.current = false)}
+        ref={trackRef}
+        className="flex py-2 sm:py-3 will-change-transform"
+        style={{ width: "max-content", contain: "content" }}
       >
         {loop.map((b, i) => {
-          const content = (
-  <div
-    className="
-      group relative aspect-[16/9] shrink-0 overflow-hidden rounded-3xl
-      bg-white/5
-      shadow-[0_14px_50px_rgba(0,0,0,.45)]
-      transition-transform duration-300 hover:-translate-y-0.5
-    "
-    style={{ width: `${cardW}px`, marginRight: `${gapW}px` }}
-    aria-label={b.title || b.alt_text || ""}
-  >
-    {/* รูป */}
-    <img
-      src={b.image_url}
-      alt={b.alt_text || b.title || "banner"}
-      className="absolute inset-0 h-full w-full object-cover"
-      loading="lazy"
-      draggable={false}
-    />
+          const title = (b.title || b.alt_text || "").trim();
+          const sub = (b.cta || b.subtitle || "").trim();
 
-    {/* overlay ทำให้ text อ่านง่าย */}
-    <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-black/25 to-black/10" />
+          const card = (
+            <article
+              className={[
+                "group relative shrink-0 overflow-hidden rounded-3xl",
+                "bg-white/5 ring-1 ring-white/10",
+                "shadow-[0_18px_60px_rgba(0,0,0,.45)]",
+                "transition-transform duration-300 hover:-translate-y-0.5",
+              ].join(" ")}
+              style={{ width: `${cardW}px`, marginRight: `${gapW}px` }}
+              aria-label={title}
+            >
+              {/* image */}
+              <div className="relative aspect-[16/9] overflow-hidden">
+                <img
+                  /* ✅ เปลี่ยนแค่ src ให้ Cloudinary optimize + ตั้ง priority เฉพาะรูปแรก */
+                  src={cld(b.image_url, 1000)}
+                  alt={b.alt_text || b.title || "banner"}
+                  className="absolute inset-0 h-full w-full object-cover"
+                  loading={i === 0 ? "eager" : "lazy"}
+                  fetchPriority={i === 0 ? "high" : "auto"}
+                  draggable={false}
+                />
 
-    {/* มุมซ้ายบน: chip */}
-    {(b.genre || b.subtitle) && (
-      <div className="absolute left-3 top-3 z-10">
-        <span className="rounded-full bg-black/45 px-3 py-1 text-[11px] font-semibold text-white ring-1 ring-white/15 backdrop-blur">
-          {b.genre}
-          {b.genre && b.subtitle ? <span className="px-1 opacity-60">•</span> : null}
-          {b.subtitle}
-        </span>
-      </div>
-    )}
+                <div className="mt-2 h-[2px] w-full bg-gradient-to-r from-transparent via-white/40 to-transparent" />
 
-    {/* มุมขวาบน: logo เล็ก */}
-    <div className="absolute right-3 top-3 z-10 rounded-full bg-white/90 px-2 py-1 text-[10px] font-extrabold text-black">
-      TopAward
-    </div>
+                {/* badge left */}
+                {(b.genre || b.subtitle) && (
+                  <div className="absolute left-3 top-3 z-10">
+                    <span className="rounded-full bg-black/45 px-3 py-1 text-[11px] font-semibold text-white ring-1 ring-white/15 backdrop-blur">
+                      {b.genre}
+                      {b.genre && b.subtitle ? (
+                        <span className="px-1 opacity-60">•</span>
+                      ) : null}
+                      {b.subtitle}
+                    </span>
+                  </div>
+                )}
 
-    {/* ด้านล่าง: title bar แบบ glass */}
-    {(b.title || b.alt_text) && (
-      <div className="absolute inset-x-3 bottom-3 z-10">
-        <div className="rounded-2xl bg-white/10 px-3 py-2.5 ring-1 ring-white/20 backdrop-blur">
-          <div className="line-clamp-1 text-sm font-extrabold text-white drop-shadow">
-            {b.title || b.alt_text}
-          </div>
+                {/* ✅ bottom glass bar (อ่านง่ายกว่าเดิม) */}
+                {(title || sub) && (
+                  <div className="absolute inset-x-3 bottom-3 z-10">
+                    <div className="rounded-2xl bg-[#0B1220]/55 px-3 py-2.5 ring-1 ring-white/15 backdrop-blur-md">
+                      {title && (
+                        <div className="line-clamp-1 text-[13px] font-extrabold text-white sm:text-sm">
+                          {title}
+                        </div>
+                      )}
+                      {sub && (
+                        <div className="mt-0.5 line-clamp-1 text-[11px] text-white/75 sm:text-[12px]">
+                          {sub}
+                        </div>
+                      )}
 
-          {/* subtitle/cta ถ้ามี */}
-          {(b.cta || b.subtitle) && (
-            <div className="mt-0.5 line-clamp-1 text-[11px] text-white/80">
-              {b.cta || b.subtitle}
-            </div>
-          )}
-
-          <div className="mt-2 h-[2px] w-full bg-gradient-to-r from-transparent via-[#D4AF37] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-        </div>
-      </div>
-    )}
-  </div>
-);
+                      {/* ✅ เปลี่ยนจากทอง → ขาว/เทา (ตามที่บอกไม่เอาเหลืองทอง) */}
+                      <div className="mt-2 h-[2px] w-full bg-gradient-to-r from-transparent via-white/40 to-transparent opacity-70" />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </article>
+          );
 
           return b.href ? (
-            <a key={`${b.id}-${i}`} href={b.href} className="focus:outline-none focus:ring-2 focus:ring-amber-500 rounded-2xl">
-              {content}
+            <a
+              key={`${b.id}-${i}`}
+              href={b.href}
+              className="focus:outline-none focus:ring-2 focus:ring-amber-500 rounded-3xl"
+            >
+              {card}
             </a>
           ) : (
-            <div key={`${b.id}-${i}`}>{content}</div>
+            <div key={`${b.id}-${i}`}>{card}</div>
           );
         })}
       </div>

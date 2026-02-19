@@ -1,6 +1,15 @@
 /* src/app/admin/banners/page.tsx */
 "use client";
-
+import {
+  Pencil,
+  Power,
+  Trash2,
+  RefreshCw,
+  X,
+  Save,
+  CheckCircle2,
+  Ban,
+} from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useConfirm } from "@/hooks/useConfirm";
 
@@ -17,6 +26,24 @@ const THEME = {
   textMain: "text-white",
   textMuted: "text-slate-400",
 };
+// ===== Buttons (match Videos page vibe) =====
+const btnBase =
+  "inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold " +
+  "transition-all active:scale-[.98] disabled:opacity-60 disabled:cursor-not-allowed " +
+  "ring-1 ring-white/10 bg-white/5 hover:bg-white/10";
+
+const btnPrimary =
+  btnBase +
+  " bg-indigo-600/90 hover:bg-indigo-600 text-white ring-indigo-400/20";
+
+const btnDanger =
+  btnBase +
+  " bg-rose-600/90 hover:bg-rose-600 text-white ring-rose-400/20";
+
+const btnGhost =
+  btnBase + " text-white";
+
+const btnIcon = "h-4 w-4";
 const btnGold =
   "bg-gradient-to-r from-[#FFD700] to-[#B8860B] text-black shadow-md hover:from-[#FFCC33] hover:to-[#FFD700]";
 
@@ -36,6 +63,35 @@ type Banner = {
   created_at?: string;
 };
 
+const iconCircleBase =
+  "cursor-pointer select-none inline-flex items-center justify-center " +
+  "w-11 h-11 rounded-full shadow-sm transition-all duration-200 " +
+  "active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed " +
+  "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-950";
+
+const iconCircleNeutral =
+  `${iconCircleBase} bg-white/5 border border-white/10 text-white hover:bg-white/10 hover:shadow-md hover:ring-2 hover:ring-white/20`;
+
+const iconCirclePrimary =
+  `${iconCircleBase} bg-indigo-600 text-white hover:bg-indigo-700 hover:shadow-lg hover:ring-2 hover:ring-indigo-300`;
+
+const iconCircleDanger =
+  `${iconCircleBase} bg-rose-600 text-white hover:bg-rose-700 hover:shadow-lg hover:ring-2 hover:ring-rose-300`;
+
+const iconCircleSuccess =
+  `${iconCircleBase} bg-emerald-600 text-white hover:bg-emerald-700 hover:shadow-lg hover:ring-2 hover:ring-emerald-300`;
+
+const iconCircleDim =
+  `${iconCircleBase} bg-slate-700 text-white hover:bg-slate-800 hover:shadow-lg hover:ring-2 hover:ring-slate-300`;
+
+const badgePillBase =
+  "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ring-1";
+
+const badgeActive =
+  `${badgePillBase} bg-emerald-500/15 text-emerald-200 ring-emerald-500/30`;
+
+const badgeHidden =
+  `${badgePillBase} bg-white/10 text-slate-200 ring-white/15`;
 /* ---------- Tiny UI helpers (UI เท่านั้น) ---------- */
 const labelCls = "text-sm text-slate-300/80";
 const inputCls =
@@ -82,7 +138,7 @@ export default function AdminBannersPage() {
   const [editPreview, setEditPreview] = useState<string | null>(null);
   const [editCurrentImage, setEditCurrentImage] = useState<string | null>(null);
   const editFileRef = useRef<HTMLInputElement | null>(null);
-const [editContainMode, setEditContainMode] = useState(false);
+  const [editContainMode, setEditContainMode] = useState(false);
 
   useEffect(() => {
     refetch();
@@ -101,8 +157,8 @@ const [editContainMode, setEditContainMode] = useState(false);
         Array.isArray(data?.banners)
           ? data.banners
           : Array.isArray(data)
-          ? data
-          : data?.data || [];
+            ? data
+            : data?.data || [];
       setList(rows);
     } finally {
       setLoading(false);
@@ -121,24 +177,24 @@ const [editContainMode, setEditContainMode] = useState(false);
   }, [q, list]);
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
-  const f = e.target.files?.[0] || null;
+    const f = e.target.files?.[0] || null;
 
-  // ✅ บังคับไม่เกิน 1MB + เด้ง Alert
-  if (f && f.size > MAX_IMAGE_SIZE) {
-    await confirm({
-      title: "เกิดข้อผิดพลาด",
-      description: "ไฟล์เกิน 1MB กรุณาเลือกไฟล์ที่เล็กกว่า 1MB",
-      confirmText: "ตกลง",
-    });
-    if (fileRef.current) fileRef.current.value = "";
-    setFile(null);
-    setPreview(null);
-    return;
+    // ✅ บังคับไม่เกิน 1MB + เด้ง Alert
+    if (f && f.size > MAX_IMAGE_SIZE) {
+      await confirm({
+        title: "เกิดข้อผิดพลาด",
+        description: "ไฟล์เกิน 1MB กรุณาเลือกไฟล์ที่เล็กกว่า 1MB",
+        confirmText: "ตกลง",
+      });
+      if (fileRef.current) fileRef.current.value = "";
+      setFile(null);
+      setPreview(null);
+      return;
+    }
+
+    setFile(f);
+    setPreview(f ? URL.createObjectURL(f) : null);
   }
-
-  setFile(f);
-  setPreview(f ? URL.createObjectURL(f) : null);
-}
 
   // helpers
   function appendIf(fd: FormData, key: string, val?: any) {
@@ -149,128 +205,128 @@ const [editContainMode, setEditContainMode] = useState(false);
     try {
       const j = await res.clone().json();
       return j?.message || j?.error || JSON.stringify(j);
-    } catch {}
+    } catch { }
     try {
       const t = await res.clone().text();
       return t || `HTTP ${res.status}`;
-    } catch {}
+    } catch { }
     return `HTTP ${res.status}`;
   }
 
   // ===== logic เดิมทั้งชุด (CREATE/EDIT/DELETE/TOGGLE) — ไม่แก้ =====
-  async function onCreate(e: React.FormEvent) { /* ...เดิมทุกบรรทัด... */ 
+  async function onCreate(e: React.FormEvent) { /* ...เดิมทุกบรรทัด... */
     e.preventDefault(); setLoading(true);
     if (file && file.size > MAX_IMAGE_SIZE) {
-  await confirm({
-    title: "เกิดข้อผิดพลาด",
-    description: "ไฟล์เกิน 1MB กรุณาเลือกไฟล์ที่เล็กกว่า 1MB",
-    confirmText: "ตกลง",
-  });
-  setLoading(false);
-  return;
-}
+      await confirm({
+        title: "เกิดข้อผิดพลาด",
+        description: "ไฟล์เกิน 1MB กรุณาเลือกไฟล์ที่เล็กกว่า 1MB",
+        confirmText: "ตกลง",
+      });
+      setLoading(false);
+      return;
+    }
     try {
       const fd = new FormData();
-      appendIf(fd,"title",title.trim());
-      appendIf(fd,"store_name",storeName.trim());
-      appendIf(fd,"alt_text",(altText||title||"banner").trim());
-      appendIf(fd,"link_url",link.trim());
-      appendIf(fd,"href",link.trim());
-      if (order!=="" && !Number.isNaN(Number(order))) {
-        appendIf(fd,"order",Number(order)); appendIf(fd,"order_number",Number(order));
+      appendIf(fd, "title", title.trim());
+      appendIf(fd, "store_name", storeName.trim());
+      appendIf(fd, "alt_text", (altText || title || "banner").trim());
+      appendIf(fd, "link_url", link.trim());
+      appendIf(fd, "href", link.trim());
+      if (order !== "" && !Number.isNaN(Number(order))) {
+        appendIf(fd, "order", Number(order)); appendIf(fd, "order_number", Number(order));
       }
-      appendIf(fd,"is_active",!!active);
-      appendIf(fd,"start_date",start||undefined);
-      appendIf(fd,"end_date",end||undefined);
-      if (file) fd.append(FILE_FIELD,file);
-      const res = await fetch(`${API_URL}/admin/banners`,{method:"POST",credentials:"include",body:fd});
-      if (!res.ok) { const msg = await extractErrorMessage(res); await confirm({title:"เพิ่มไม่สำเร็จ",description:msg,confirmText:"ปิด"}); return; }
+      appendIf(fd, "is_active", !!active);
+      appendIf(fd, "start_date", start || undefined);
+      appendIf(fd, "end_date", end || undefined);
+      if (file) fd.append(FILE_FIELD, file);
+      const res = await fetch(`${API_URL}/admin/banners`, { method: "POST", credentials: "include", body: fd });
+      if (!res.ok) { const msg = await extractErrorMessage(res); await confirm({ title: "เพิ่มไม่สำเร็จ", description: msg, confirmText: "ปิด" }); return; }
       setTitle(""); setStoreName(""); setAltText(""); setLink(""); setOrder(""); setActive(true); setStart(""); setEnd("");
-      setFile(null); setPreview(null); if (fileRef.current) fileRef.current.value="";
+      setFile(null); setPreview(null); if (fileRef.current) fileRef.current.value = "";
       await refetch();
-    } catch (err:any) {
-      await confirm({title:"เพิ่มไม่สำเร็จ",description:err?.message||"เกิดข้อผิดพลาด",confirmText:"ปิด"});
+    } catch (err: any) {
+      await confirm({ title: "เพิ่มไม่สำเร็จ", description: err?.message || "เกิดข้อผิดพลาด", confirmText: "ปิด" });
     } finally { setLoading(false); }
   }
 
   function openEdit(b: Banner) {
-  setEditId(b.id); setEditCurrentImage(b.image_url||null); setEditPreview(null);
-  setEditVals({
-    title:b.title||"", store_name:b.store_name||"", alt_text:b.alt_text||b.title||"banner",
-    link_url:b.link_url||b.href||"", order_input:(b.order??b.order_number)??"", is_active:!!b.is_active,
-    start_date:b.start_date?b.start_date.slice(0,10):"", end_date:b.end_date?b.end_date.slice(0,10):"",
-  });
-  setEditOpen(true);
-}
-  function closeEdit(){ setEditOpen(false); setEditId(null); setEditFile(null); setEditPreview(null); setEditCurrentImage(null); if(editFileRef.current) editFileRef.current.value=""; }
-  async function onEditFile(e: React.ChangeEvent<HTMLInputElement>) {
-  const f = e.target.files?.[0] || null;
-
-  // ✅ บังคับไม่เกิน 1MB + เด้ง Alert
-  if (f && f.size > MAX_IMAGE_SIZE) {
-    await confirm({
-      title: "เกิดข้อผิดพลาด",
-      description: "ไฟล์เกิน 1MB กรุณาเลือกไฟล์ที่เล็กกว่า 1MB",
-      confirmText: "ตกลง",
+    setEditId(b.id); setEditCurrentImage(b.image_url || null); setEditPreview(null);
+    setEditVals({
+      title: b.title || "", store_name: b.store_name || "", alt_text: b.alt_text || b.title || "banner",
+      link_url: b.link_url || b.href || "", order_input: (b.order ?? b.order_number) ?? "", is_active: !!b.is_active,
+      start_date: b.start_date ? b.start_date.slice(0, 10) : "", end_date: b.end_date ? b.end_date.slice(0, 10) : "",
     });
-    if (editFileRef.current) editFileRef.current.value = "";
-    setEditFile(null);
-    setEditPreview(null);
-    return;
+    setEditOpen(true);
+  }
+  function closeEdit() { setEditOpen(false); setEditId(null); setEditFile(null); setEditPreview(null); setEditCurrentImage(null); if (editFileRef.current) editFileRef.current.value = ""; }
+  async function onEditFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0] || null;
+
+    // ✅ บังคับไม่เกิน 1MB + เด้ง Alert
+    if (f && f.size > MAX_IMAGE_SIZE) {
+      await confirm({
+        title: "เกิดข้อผิดพลาด",
+        description: "ไฟล์เกิน 1MB กรุณาเลือกไฟล์ที่เล็กกว่า 1MB",
+        confirmText: "ตกลง",
+      });
+      if (editFileRef.current) editFileRef.current.value = "";
+      setEditFile(null);
+      setEditPreview(null);
+      return;
+    }
+
+    setEditFile(f);
+    setEditPreview(f ? URL.createObjectURL(f) : null);
   }
 
-  setEditFile(f);
-  setEditPreview(f ? URL.createObjectURL(f) : null);
-}
-
-  async function onUpdate(e: React.FormEvent){ /* เดิม */ 
-    e.preventDefault(); if(!editId) return; setLoading(true);
+  async function onUpdate(e: React.FormEvent) { /* เดิม */
+    e.preventDefault(); if (!editId) return; setLoading(true);
     // กันพลาด: ถ้าไฟล์เกิน 1MB ให้หยุดและเด้ง Alert
-if (editFile && editFile.size > MAX_IMAGE_SIZE) {
-  await confirm({
-    title: "เกิดข้อผิดพลาด",
-    description: "ไฟล์เกิน 1MB กรุณาเลือกไฟล์ที่เล็กกว่า 1MB",
-    confirmText: "ตกลง",
-  });
-  setLoading(false);
-  return;
-}
-    try{
-      const fd=new FormData();
-      appendIf(fd,"title",editVals.title.trim());
-      appendIf(fd,"store_name",editVals.store_name.trim());
-      appendIf(fd,"alt_text",(editVals.alt_text||editVals.title||"banner").trim());
-      appendIf(fd,"link_url",editVals.link_url.trim()); appendIf(fd,"href",editVals.link_url.trim());
-      if(editVals.order_input!=="" && !Number.isNaN(Number(editVals.order_input))){ appendIf(fd,"order",Number(editVals.order_input)); appendIf(fd,"order_number",Number(editVals.order_input)); }
-      appendIf(fd,"is_active",!!editVals.is_active);
-      appendIf(fd,"start_date",editVals.start_date||undefined);
-      appendIf(fd,"end_date",editVals.end_date||undefined);
-      if(editFile) fd.append(FILE_FIELD,editFile);
-      const res=await fetch(`${API_URL}/admin/banners/${encodeURIComponent(editId)}`,{method:"PATCH",credentials:"include",body:fd});
-      if(!res.ok){ const msg=await extractErrorMessage(res); await confirm({title:"อัปเดตไม่สำเร็จ",description:msg,confirmText:"ปิด"}); return; }
+    if (editFile && editFile.size > MAX_IMAGE_SIZE) {
+      await confirm({
+        title: "เกิดข้อผิดพลาด",
+        description: "ไฟล์เกิน 1MB กรุณาเลือกไฟล์ที่เล็กกว่า 1MB",
+        confirmText: "ตกลง",
+      });
+      setLoading(false);
+      return;
+    }
+    try {
+      const fd = new FormData();
+      appendIf(fd, "title", editVals.title.trim());
+      appendIf(fd, "store_name", editVals.store_name.trim());
+      appendIf(fd, "alt_text", (editVals.alt_text || editVals.title || "banner").trim());
+      appendIf(fd, "link_url", editVals.link_url.trim()); appendIf(fd, "href", editVals.link_url.trim());
+      if (editVals.order_input !== "" && !Number.isNaN(Number(editVals.order_input))) { appendIf(fd, "order", Number(editVals.order_input)); appendIf(fd, "order_number", Number(editVals.order_input)); }
+      appendIf(fd, "is_active", !!editVals.is_active);
+      appendIf(fd, "start_date", editVals.start_date || undefined);
+      appendIf(fd, "end_date", editVals.end_date || undefined);
+      if (editFile) fd.append(FILE_FIELD, editFile);
+      const res = await fetch(`${API_URL}/admin/banners/${encodeURIComponent(editId)}`, { method: "PATCH", credentials: "include", body: fd });
+      if (!res.ok) { const msg = await extractErrorMessage(res); await confirm({ title: "อัปเดตไม่สำเร็จ", description: msg, confirmText: "ปิด" }); return; }
       closeEdit(); await refetch();
-    } catch(err:any){ await confirm({title:"อัปเดตไม่สำเร็จ",description:err?.message||"เกิดข้อผิดพลาด",confirmText:"ปิด"}); }
-    finally{ setLoading(false); }
+    } catch (err: any) { await confirm({ title: "อัปเดตไม่สำเร็จ", description: err?.message || "เกิดข้อผิดพลาด", confirmText: "ปิด" }); }
+    finally { setLoading(false); }
   }
 
-  async function onDelete(id: string){ /* เดิม */ 
-    const ok=await confirm({title:"ลบแบนเนอร์นี้?",description:"ยืนยันแล้วจะไม่สามารถกู้คืนได้",confirmText:"ลบ",cancelText:"ยกเลิก"}); if(!ok) return;
-    setLoading(true); try{
-      const res=await fetch(`${API_URL}/admin/banners/${encodeURIComponent(id)}`,{method:"DELETE",credentials:"include"});
-      if(!res.ok){ const msg=await extractErrorMessage(res); await confirm({title:"ลบไม่สำเร็จ",description:msg,confirmText:"ปิด"}); return; }
+  async function onDelete(id: string) { /* เดิม */
+    const ok = await confirm({ title: "ลบแบนเนอร์นี้?", description: "ยืนยันแล้วจะไม่สามารถกู้คืนได้", confirmText: "ลบ", cancelText: "ยกเลิก" }); if (!ok) return;
+    setLoading(true); try {
+      const res = await fetch(`${API_URL}/admin/banners/${encodeURIComponent(id)}`, { method: "DELETE", credentials: "include" });
+      if (!res.ok) { const msg = await extractErrorMessage(res); await confirm({ title: "ลบไม่สำเร็จ", description: msg, confirmText: "ปิด" }); return; }
       await refetch();
-    } finally{ setLoading(false); }
+    } finally { setLoading(false); }
   }
 
-  async function onToggleActive(b: Banner){ /* เดิม */ 
+  async function onToggleActive(b: Banner) { /* เดิม */
     setLoading(true);
-    try{
-      const fd=new FormData(); appendIf(fd,"is_active",!b.is_active);
-      const res=await fetch(`${API_URL}/admin/banners/${encodeURIComponent(b.id)}`,{method:"PATCH",credentials:"include",body:fd});
-      if(!res.ok){ const msg=await extractErrorMessage(res); await confirm({title:"อัปเดตไม่สำเร็จ",description:msg,confirmText:"ปิด"}); return; }
-      await fetch("/api/revalidate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({tag:"banners"})});
+    try {
+      const fd = new FormData(); appendIf(fd, "is_active", !b.is_active);
+      const res = await fetch(`${API_URL}/admin/banners/${encodeURIComponent(b.id)}`, { method: "PATCH", credentials: "include", body: fd });
+      if (!res.ok) { const msg = await extractErrorMessage(res); await confirm({ title: "อัปเดตไม่สำเร็จ", description: msg, confirmText: "ปิด" }); return; }
+      await fetch("/api/revalidate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tag: "banners" }) });
       await refetch();
-    } finally{ setLoading(false); }
+    } finally { setLoading(false); }
   }
 
   return (
@@ -350,23 +406,23 @@ if (editFile && editFile.size > MAX_IMAGE_SIZE) {
                 className="mt-1 block w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-white/10 file:px-3 file:py-1.5 file:text-white hover:file:bg-white/20"
               />
               {preview && (
-  <div className="mt-3 h-32 w-56 overflow-hidden rounded-xl border border-white/10 bg-black/30">
-    <img
-      src={preview}
-      className={`h-full w-full ${containMode ? "object-contain" : "object-cover"}`}
-      alt="preview"
-    />
-  </div>
-)}
-<label className="mt-2 flex items-center gap-2 text-sm text-white/80">
-  <input
-    type="checkbox"
-    checked={containMode}
-    onChange={(e) => setContainMode(e.target.checked)}
-    className="h-4 w-4 accent-[#FFD700]"
-  />
-  แสดงแบบ object-contain
-</label>
+                <div className="mt-3 h-32 w-56 overflow-hidden rounded-xl border border-white/10 bg-black/30">
+                  <img
+                    src={preview}
+                    className={`h-full w-full ${containMode ? "object-contain" : "object-cover"}`}
+                    alt="preview"
+                  />
+                </div>
+              )}
+              <label className="mt-2 flex items-center gap-2 text-sm text-white/80">
+                <input
+                  type="checkbox"
+                  checked={containMode}
+                  onChange={(e) => setContainMode(e.target.checked)}
+                  className="h-4 w-4 accent-[#FFD700]"
+                />
+                แสดงแบบ object-contain
+              </label>
             </label>
           </div>
 
@@ -388,8 +444,15 @@ if (editFile && editFile.size > MAX_IMAGE_SIZE) {
                 onChange={(e) => setQ(e.target.value)}
                 className={`${inputCls} md:w-72`}
               />
-              <button onClick={refetch} disabled={loading} className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white hover:bg-white/10 active:scale-[.98] disabled:opacity-60">
-                รีเฟรช
+              <button
+                type="button"
+                onClick={refetch}
+                disabled={loading}
+                className={iconCircleNeutral}
+                title="รีเฟรช"
+                aria-label="รีเฟรช"
+              >
+                <RefreshCw size={20} className={loading ? "animate-spin" : ""} />
               </button>
             </div>
           </div>
@@ -401,7 +464,13 @@ if (editFile && editFile.size > MAX_IMAGE_SIZE) {
           ) : (
             <ul className="grid grid-cols-1 gap-4">
               {filtered.map((b) => (
-                <li key={b.id} className="flex items-center gap-4 rounded-xl border border-white/10 bg-white/5 p-3 hover:bg-white/[0.07]">
+                <li
+                  key={b.id}
+                  className="
+    relative flex items-center gap-4
+    rounded-xl border border-white/10 bg-white/5 p-3
+    hover:bg-white/[0.07]
+    pr-28">
                   <div className="h-16 w-28 shrink-0 overflow-hidden rounded bg-black/30 ring-1 ring-white/10">
                     {b.image_url ? (
                       <img src={b.image_url} alt={b.alt_text || b.title || ""} className="h-full w-full object-cover" loading="lazy" />
@@ -413,12 +482,15 @@ if (editFile && editFile.size > MAX_IMAGE_SIZE) {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="line-clamp-1 font-medium">{b.title || "—"}</span>
+
                       {b.is_active ? (
-                        <span className="rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-xs font-medium text-emerald-300 ring-1 ring-emerald-500/30">
+                        <span className={badgeActive} title="Active">
+                          <CheckCircle2 size={14} />
                           Active
                         </span>
                       ) : (
-                        <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-xs font-medium text-slate-300 ring-1 ring-white/15">
+                        <span className={badgeHidden} title="Hidden">
+                          <Ban size={14} />
                           Hidden
                         </span>
                       )}
@@ -437,20 +509,38 @@ if (editFile && editFile.size > MAX_IMAGE_SIZE) {
                     {b.alt_text ? <div className="text-xs text-slate-400">ALT: {b.alt_text}</div> : null}
                   </div>
 
-                  <div className="flex gap-2">
-                    <button onClick={() => openEdit(b)} className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-white hover:bg-white/10 active:scale-[.98]">
-                      แก้ไข
-                    </button>
+                  <div className="absolute right-3 top-3 flex items-center gap-2">
+                    {/* Edit */}
                     <button
+  type="button"
+  onClick={() => openEdit(b)}
+  className={iconCirclePrimary}
+  title="แก้ไข"
+  aria-label="แก้ไข"
+>
+  <Pencil size={18} />
+</button>
+
+                    {/* Enable / Disable */}
+                    <button
+                      type="button"
                       onClick={() => onToggleActive(b)}
-                      className={`rounded-lg px-3 py-1.5 text-sm font-medium text-white shadow active:scale-[.98] ${
-                        b.is_active ? "bg-slate-600 hover:bg-slate-700" : "bg-emerald-600 hover:bg-emerald-700"
-                      }`}
+                      className={b.is_active ? iconCircleDim : iconCircleSuccess}
+                      title={b.is_active ? "ปิดการแสดงผล" : "เปิดการแสดงผล"}
+                      aria-label={b.is_active ? "Disable" : "Enable"}
                     >
-                      {b.is_active ? "Disable" : "Enable"}
+                      <Power size={18} />
                     </button>
-                    <button onClick={() => onDelete(b.id)} className="rounded-lg bg-rose-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-rose-700 active:scale-[.98]">
-                      ลบ
+
+                    {/* Delete */}
+                    <button
+                      type="button"
+                      onClick={() => onDelete(b.id)}
+                      className={iconCircleDanger}
+                      title="ลบ"
+                      aria-label="ลบ"
+                    >
+                      <Trash2 size={18} />
                     </button>
                   </div>
                 </li>
@@ -468,9 +558,6 @@ if (editFile && editFile.size > MAX_IMAGE_SIZE) {
             {/* header */}
             <div className="flex items-center justify-between px-5 py-4">
               <h3 className="text-lg font-semibold">แก้ไขแบนเนอร์</h3>
-              <button onClick={closeEdit} className="rounded-md px-2 py-1 text-sm text-slate-300 hover:bg-white/10 hover:text-white">
-                ปิด
-              </button>
             </div>
 
             {/* content */}
@@ -520,9 +607,9 @@ if (editFile && editFile.size > MAX_IMAGE_SIZE) {
                   <input type="date" value={editVals.end_date} onChange={(e) => setEditVals((s) => ({ ...s, end_date: e.target.value }))} className={inputCls} />
                 </label>
 
-                
 
-                                  <label className="block">
+
+                <label className="block">
                   <span className={labelCls}>สิ้นสุด</span>
                   <input type="date" value={editVals.end_date} onChange={(e) => setEditVals((s) => ({ ...s, end_date: e.target.value }))} className={inputCls} />
                 </label>
@@ -577,11 +664,28 @@ if (editFile && editFile.size > MAX_IMAGE_SIZE) {
 
             {/* action bar */}
             <div className="sticky bottom-0 flex items-center justify-end gap-3 border-t border-white/10 bg-slate-900/95 px-5 py-3 backdrop-blur">
-              <button form="edit-banner-form" disabled={loading} className={`rounded-lg px-4 py-2 ${btnGold} disabled:opacity-60 active:scale-[.98]`}>
-                {loading ? "กำลังบันทึก…" : "บันทึกการแก้ไข"}
+              {/* Cancel */}
+              <button
+                type="button"
+                onClick={closeEdit}
+                className={iconCircleNeutral}
+                title="ยกเลิก"
+                aria-label="ยกเลิก"
+                disabled={loading}
+              >
+                <X size={18} />
               </button>
-              <button type="button" onClick={closeEdit} className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-white hover:bg-white/10">
-                ยกเลิก
+
+              {/* Save */}
+              <button
+                type="submit"
+                form="edit-banner-form"
+                className={iconCirclePrimary}
+                title="บันทึก"
+                aria-label="บันทึก"
+                disabled={loading}
+              >
+                <Save size={18} />
               </button>
             </div>
           </div>

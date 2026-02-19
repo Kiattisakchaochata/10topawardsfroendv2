@@ -1,5 +1,6 @@
+//src/app/admin/seo/pages/page.tsx
 'use client';
-
+import { Pencil, Trash2, Plus, FileText, X, Save } from 'lucide-react';
 export const dynamic = 'force-dynamic';
 
 import { Suspense, useEffect, useMemo, useState } from 'react';
@@ -8,6 +9,42 @@ import { apiFetch } from '@/lib/api';
 import OgPicker4 from '@/components/admin/OgPicker4';
 import { Swal } from '@/lib/swal';
 
+/** ✅ Button theme: match /admin/videos (circle icon buttons with shadow + ring hover) */
+const iconCircleBase =
+  "cursor-pointer select-none inline-flex items-center justify-center " +
+  "w-11 h-11 rounded-full shadow-sm transition-all duration-200 " +
+  "active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed " +
+  "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-950";
+
+const iconCircleNeutral =
+  `${iconCircleBase} bg-white/5 border border-white/10 text-white ` +
+  `hover:bg-white/10 hover:shadow-md hover:ring-2 hover:ring-white/20`;
+
+const iconCirclePrimary =
+  `${iconCircleBase} bg-indigo-600 text-white ` +
+  `hover:bg-indigo-700 hover:shadow-lg hover:ring-2 hover:ring-indigo-300`;
+
+const iconCircleDanger =
+  `${iconCircleBase} bg-rose-600 text-white ` +
+  `hover:bg-rose-700 hover:shadow-lg hover:ring-2 hover:ring-rose-300`;
+
+const iconCircleSuccess =
+  `${iconCircleBase} bg-emerald-600 text-white ` +
+  `hover:bg-emerald-700 hover:shadow-lg hover:ring-2 hover:ring-emerald-300`;
+
+const iconCircleDim =
+  `${iconCircleBase} bg-slate-700 text-white ` +
+  `hover:bg-slate-800 hover:shadow-lg hover:ring-2 hover:ring-slate-300`;
+
+/** pill helper (optional but makes header buttons consistent) */
+const BTN_BASE =
+  "inline-flex items-center justify-center gap-2 rounded-full ring-1 ring-white/10 " +
+  "transition-all duration-150 cursor-pointer select-none " +
+  "hover:ring-white/20 hover:shadow-lg hover:-translate-y-[1px] " +
+  "active:translate-y-0 active:scale-95 " +
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/40";
+
+const BTN_ICON = "transition-transform duration-150 group-hover:scale-110";
 // ✅ เพิ่มแค่คอนสแตนต์ขีดจำกัดให้ชัดเจน (ตาม Prisma)
 const PATH_MAX = 255;
 const TITLE_MAX = 255;
@@ -29,7 +66,7 @@ type PageSeo = {
   keywords?: string;
 };
 type SchemaType = string;
-const KNOWN_TYPES = ['Restaurant','LocalBusiness','CafeOrCoffeeShop','HairSalon','CarWash','custom'] as const;
+const KNOWN_TYPES = ['Restaurant', 'LocalBusiness', 'CafeOrCoffeeShop', 'HairSalon', 'CarWash', 'custom'] as const;
 function normalizeUrl(u?: string) {
   if (!u) return '';
   return String(u).trim();
@@ -63,12 +100,12 @@ function buildLocalBusinessJsonLd(input: {
   const addr: any =
     input.addressLine || input.locality || input.postalCode || input.country
       ? {
-          '@type': 'PostalAddress',
-          streetAddress: input.addressLine || undefined,
-          addressLocality: input.locality || undefined,
-          postalCode: input.postalCode || undefined,
-          addressCountry: input.country || 'TH',
-        }
+        '@type': 'PostalAddress',
+        streetAddress: input.addressLine || undefined,
+        addressLocality: input.locality || undefined,
+        postalCode: input.postalCode || undefined,
+        addressCountry: input.country || 'TH',
+      }
       : undefined;
 
   const data: Record<string, any> = {
@@ -217,7 +254,7 @@ export default function AdminSeoPagesPage() {
       }
 
       // ไม่ต้อง await เพื่อกันแขวนถ้า /admin/seo/pages ช้า
-      refresh().catch(() => {});
+      refresh().catch(() => { });
       return true;
     } catch (e: any) {
       console.error('[page-seo] save error:', e);
@@ -278,11 +315,12 @@ export default function AdminSeoPagesPage() {
           <div className="flex items-center justify-between">
             <h1 className="text-2xl font-semibold">Page SEO</h1>
             <button
-              onClick={startNew}
-              className="rounded-full bg-gradient-to-r from-[#FFD700] to-[#B8860B] hover:from-[#FFCC33] hover:to-[#FFD700] text-black shadow px-5 py-2.5 font-semibold"
-            >
-              + สร้าง
-            </button>
+  onClick={startNew}
+  className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[#FFD700] to-[#B8860B] hover:from-[#FFCC33] hover:to-[#FFD700] text-black shadow px-5 py-2.5 font-semibold cursor-pointer"
+>
+  <Plus size={18} />
+  สร้าง
+</button>
           </div>
 
           {loadErr && (
@@ -325,21 +363,26 @@ export default function AdminSeoPagesPage() {
                       <td className="p-3">{r.title || '-'}</td>
                       <td className="p-3">{r.noindex ? '✅' : '—'}</td>
                       <td className="p-3">
-                        <div className="flex gap-2">
+                        <div className="flex items-center justify-end gap-2">
                           <button
-                            onClick={() =>
-                              setEditing({ ...r, jsonld: safeJson(r.jsonld) })
-                            }
-                            className="px-3 py-1 rounded-full bg-slate-700/70 hover:bg-slate-700 text-slate-200"
-                          >
-                            แก้ไข
-                          </button>
-                          <button
-                            onClick={() => onDelete(r.id)}
-                            className="px-3 py-1 rounded-full bg-red-600/90 hover:bg-red-600 text-white"
-                          >
-                            ลบ
-                          </button>
+  type="button"
+  onClick={() => setEditing({ ...r, jsonld: safeJson(r.jsonld) })}
+  className={iconCirclePrimary}
+  title="แก้ไข"
+  aria-label="แก้ไข"
+>
+  <Pencil size={18} />
+</button>
+
+<button
+  type="button"
+  onClick={() => onDelete(r.id)}
+  className={iconCircleDanger}
+  title="ลบ"
+  aria-label="ลบ"
+>
+  <Trash2 size={18} />
+</button>
                         </div>
                       </td>
                     </tr>
@@ -422,6 +465,7 @@ function EditModal({
 
   const [ogList, setOgList] = useState<string[]>(['', '', '', '']);
   const [btnLoading, setBtnLoading] = useState(false);
+    const isEdit = !!editing?.id;
   const [jsonldTouched, setJsonldTouched] = useState(false);
   // ★ Schema Builder state
   const [builderEnabled, setBuilderEnabled] = useState(false);
@@ -448,7 +492,7 @@ function EditModal({
       ...s,
       url: site + normPath(form.path || '/'),
     }));
-    
+
   }, [form.path]);
   const [didPrefillBuilder, setDidPrefillBuilder] = useState(false);
   // รูปที่จะใช้เป็น image[] ของ schema = จาก OG picker
@@ -634,10 +678,37 @@ function EditModal({
 
   return (
     <div className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm grid place-items-center p-4">
-      <div className="w-full max-w-2xl rounded-2xl bg-white/5 backdrop-blur ring-1 ring-white/10 shadow-2xl">
-        <div className="px-6 pt-6">
-          <h2 className="text-xl font-semibold">{editing?.id ? 'แก้ไข' : 'สร้าง'} Page SEO</h2>
-        </div>
+  <div className="relative w-full max-w-2xl rounded-2xl bg-white/5 backdrop-blur ring-1 ring-white/10 shadow-2xl">
+  <div className="px-6 pt-6 flex items-center justify-between gap-3">
+    <h2 className="text-xl font-semibold inline-flex items-center gap-2">
+      {isEdit ? <Pencil size={18} /> : <Plus size={18} />}
+      <FileText size={18} className="opacity-80" />
+      {isEdit ? 'แก้ไข' : 'สร้าง'} Page SEO
+    </h2>
+
+    <div className="flex items-center gap-3">
+      <button
+        type="button"
+        onClick={() => setEditing(null)}
+        className={iconCircleNeutral}
+        title="ปิด"
+        aria-label="ปิด"
+      >
+        <X size={18} />
+      </button>
+
+      <button
+        type="button"
+        onClick={saveWithImages}
+        disabled={btnLoading || loading}
+        className={iconCirclePrimary}
+        title="บันทึก"
+        aria-label="บันทึก"
+      >
+        <Save size={18} className={btnLoading || loading ? "opacity-60" : ""} />
+      </button>
+    </div>
+  </div>
 
         <div className="px-6 pb-6 mt-4 space-y-4 max-h-[70vh] overflow-y-auto">
           <Input label="Path (เช่น /about, /stores/abc)" value={form.path} onChange={(v) => setForm((s) => ({ ...s, path: v }))} />
@@ -781,25 +852,6 @@ function EditModal({
             }}
           />
 
-        </div>
-
-        <div className="sticky bottom-0 bg-white/5 backdrop-blur px-6 pb-6 pt-3 rounded-b-2xl flex justify-end gap-2">
-          <button
-            onClick={() => setEditing(null)}
-            className="rounded-full px-4 py-2 bg-white/10 hover:bg-white/15"
-          >
-            ยกเลิก
-          </button>
-          <button
-            onClick={saveWithImages}
-            disabled={btnLoading || loading}
-            className="rounded-full px-5 py-2 font-semibold
-               bg-gradient-to-r from-[#FFD700] to-[#B8860B]
-               hover:from-[#FFCC33] hover:to-[#FFD700]
-               text-black shadow disabled:opacity-60"
-          >
-            {btnLoading || loading ? 'กำลังบันทึก…' : 'บันทึก'}
-          </button>
         </div>
       </div>
     </div>

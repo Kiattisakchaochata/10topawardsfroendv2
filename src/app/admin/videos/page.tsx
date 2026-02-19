@@ -1,6 +1,14 @@
 // src/app/admin/videos/page.tsx
 "use client";
-
+import {
+  Power,
+  Pencil,
+  QrCode,
+  MessageSquare,
+  Trash2,
+  X,
+  Save,
+} from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useConfirm } from "@/hooks/useConfirm";
 
@@ -43,7 +51,26 @@ const inputCls =
   "mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-[#FFD700]/60";
 const btnGold =
   "bg-gradient-to-r from-[#FFD700] to-[#B8860B] text-black shadow-md hover:from-[#FFCC33] hover:to-[#FFD700] active:scale-[.98]";
+const iconCircleBase =
+  "cursor-pointer select-none inline-flex items-center justify-center " +
+  "w-11 h-11 rounded-full shadow-sm transition-all duration-200 " +
+  "active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed " +
+  "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-950";
 
+const iconCircleNeutral =
+  `${iconCircleBase} bg-white/5 border border-white/10 text-white hover:bg-white/10 hover:shadow-md hover:ring-2 hover:ring-white/20`;
+
+const iconCirclePrimary =
+  `${iconCircleBase} bg-indigo-600 text-white hover:bg-indigo-700 hover:shadow-lg hover:ring-2 hover:ring-indigo-300`;
+
+const iconCircleDanger =
+  `${iconCircleBase} bg-rose-600 text-white hover:bg-rose-700 hover:shadow-lg hover:ring-2 hover:ring-rose-300`;
+
+const iconCircleSuccess =
+  `${iconCircleBase} bg-emerald-600 text-white hover:bg-emerald-700 hover:shadow-lg hover:ring-2 hover:ring-emerald-300`;
+
+const iconCircleDim =
+  `${iconCircleBase} bg-slate-700 text-white hover:bg-slate-800 hover:shadow-lg hover:ring-2 hover:ring-slate-300`;
 /** ---------- Helpers ---------- **/
 const API_FRONT = "/api/admin/videos"; // proxy ไป backend
 const API_STORES = "/api/admin/stores"; // ใช้ดึงรายชื่อร้าน
@@ -788,33 +815,41 @@ return (
                     )}
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      onClick={() => toggleActive(v)}
-                      disabled={savingId === v.id}
-                      className={`rounded-lg px-3 py-1.5 text-sm font-medium shadow active:scale-[.98] ${
-                        v.is_active
-                          ? "bg-slate-600 text-white hover:bg-slate-700"
-                          : "bg-emerald-600 text-white hover:bg-emerald-700"
-                      } disabled:opacity-60`}
-                      title={v.is_active ? "Disable" : "Enable"}
-                    >
-                      {savingId === v.id ? "กำลังอัปเดต…" : v.is_active ? "Disable" : "Enable"}
-                    </button>
+                  <div className="flex items-center gap-2 shrink-0">
+  {/* Enable / Disable */}
+  <button
+    type="button"
+    onClick={() => toggleActive(v)}
+    disabled={savingId === v.id}
+    className={v.is_active ? iconCircleDim : iconCircleSuccess}
+    title={savingId === v.id ? "กำลังอัปเดต..." : v.is_active ? "ปิดใช้งาน" : "เปิดใช้งาน"}
+    aria-label={v.is_active ? "Disable" : "Enable"}
+  >
+    <Power size={18} className={savingId === v.id ? "opacity-60" : ""} />
+  </button>
 
-                    <button
-                      onClick={() => openEdit(v)}
-                      className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-white hover:bg-white/10"
-                    >
-                      แก้ไข
-                    </button>
-                    <button
-                      onClick={() => onDelete(v.id)}
-                      className="rounded-lg bg-rose-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-rose-700"
-                    >
-                      ลบ
-                    </button>
-                  </div>
+  {/* Edit */}
+  <button
+    type="button"
+    onClick={() => openEdit(v)}
+    className={iconCirclePrimary}
+    title="แก้ไข"
+    aria-label="แก้ไข"
+  >
+    <Pencil size={18} />
+  </button>
+
+  {/* Delete */}
+  <button
+    type="button"
+    onClick={() => onDelete(v.id)}
+    className={iconCircleDanger}
+    title="ลบ"
+    aria-label="ลบ"
+  >
+    <Trash2 size={18} />
+  </button>
+</div>
                 </li>
               ))}
             </ul>
@@ -836,12 +871,6 @@ return (
                 bg-slate-900/95 border-b border-white/10 backdrop-blur"
             >
               <h3 className="text-lg font-semibold">แก้ไขวิดีโอ</h3>
-              <button
-                onClick={closeEdit}
-                className="rounded-md px-2 py-1 text-sm text-slate-300 hover:bg-white/10 hover:text-white"
-              >
-                ปิด
-              </button>
             </div>
 
             <div ref={contentRef} className="flex-1 overflow-y-auto px-5 pb-6">
@@ -1024,21 +1053,30 @@ return src ? (
             </div>
 
             <div className="sticky bottom-0 flex items-center justify-end gap-3 border-t border-white/10 bg-slate-900/95 px-5 py-3 backdrop-blur">
-              <button
-                form="edit-video-form"
-                disabled={loading}
-                className={`rounded-lg px-4 py-2 ${btnGold} disabled:opacity-60`}
-              >
-                {loading ? "กำลังบันทึก…" : "บันทึกการแก้ไข"}
-              </button>
-              <button
-                type="button"
-                onClick={closeEdit}
-                className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-white hover:bg-white/10"
-              >
-                ยกเลิก
-              </button>
-            </div>
+  {/* Cancel */}
+  <button
+    type="button"
+    onClick={closeEdit}
+    className={iconCircleNeutral}
+    title="ยกเลิก"
+    aria-label="ยกเลิก"
+    disabled={loading}
+  >
+    <X size={18} />
+  </button>
+
+  {/* Save */}
+  <button
+    form="edit-video-form"
+    type="submit"
+    disabled={loading}
+    className={iconCirclePrimary}
+    title="บันทึก"
+    aria-label="บันทึก"
+  >
+    <Save size={18} className={loading ? "opacity-60" : ""} />
+  </button>
+</div>
           </div>
 
           <style>{`

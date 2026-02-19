@@ -4,14 +4,29 @@ import { useEffect, useRef, useState } from 'react';
 import { useGoogleLogin } from '@react-oauth/google';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
+import {
+  GoogleReCaptchaProvider,
+  useGoogleReCaptcha,
+} from 'react-google-recaptcha-v3';
 
-import { GoogleReCaptchaProvider, useGoogleReCaptcha } from 'react-google-recaptcha-v3';
-
-function GoogleButtonInner({ autoStart }: { autoStart?: boolean }) {
+function GoogleButtonInner({
+  autoStart,
+  onReady,
+}: {
+  autoStart?: boolean;
+  onReady?: () => void;
+}) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const startedRef = useRef(false);
+
+  // ✅ hook นี้จะทำงานได้ก็ต่อเมื่อถูกครอบด้วย GoogleReCaptchaProvider
   const { executeRecaptcha } = useGoogleReCaptcha();
+
+  // ✅ แจ้งว่าพร้อมแล้ว (ใช้กันกรณี user กดแล้ว provider เพิ่ง mount)
+  useEffect(() => {
+    if (executeRecaptcha) onReady?.();
+  }, [executeRecaptcha, onReady]);
 
   const login = useGoogleLogin({
     flow: 'auth-code',
@@ -19,7 +34,7 @@ function GoogleButtonInner({ autoStart }: { autoStart?: boolean }) {
       try {
         setLoading(true);
 
-        // ขอ token ตอนจะส่ง callback จริง ๆ (ไม่ยิงตอนเข้า page)
+        // ✅ ขอ token ตอนจะส่ง callback จริง ๆ เท่านั้น
         const recaptchaToken = executeRecaptcha
           ? await executeRecaptcha('login')
           : undefined;
@@ -38,7 +53,7 @@ function GoogleButtonInner({ autoStart }: { autoStart?: boolean }) {
       } catch (e: any) {
         const serverMsg = e?.response?.data
           ? JSON.stringify(e.response.data)
-          : (e?.message || 'Login failed');
+          : e?.message || 'Login failed';
         console.error('Google login error:', serverMsg);
         alert(serverMsg);
       } finally {
@@ -51,7 +66,7 @@ function GoogleButtonInner({ autoStart }: { autoStart?: boolean }) {
     },
   });
 
-  // autoStart: ให้คลิกครั้งเดียวแล้วเริ่ม flow ได้เลย
+  // ✅ autoStart: กดครั้งเดียวแล้วเริ่ม flow ได้เลย (หลัง provider mount)
   useEffect(() => {
     if (!autoStart) return;
     if (startedRef.current) return;
@@ -63,31 +78,57 @@ function GoogleButtonInner({ autoStart }: { autoStart?: boolean }) {
     <button
       type="button"
       aria-label="Sign in with Google"
-      onClick={() => { if (!loading) login(); }}
+      onClick={() => {
+        if (!loading) login();
+      }}
       disabled={loading}
       className={[
-        "w-full inline-flex items-center justify-center gap-3 px-4 py-3 rounded-xl",
-        "bg-white text-gray-800 font-medium border border-gray-200 shadow-sm",
-        "hover:bg-gray-50 hover:shadow-md",
-        "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600",
-        "active:shadow-sm",
-        "disabled:opacity-60 disabled:cursor-not-allowed",
-        "dark:border-gray-300"
-      ].join(" ")}
+        'w-full inline-flex items-center justify-center gap-3 px-4 py-3 rounded-xl',
+        'bg-white text-gray-800 font-medium border border-gray-200 shadow-sm',
+        'hover:bg-gray-50 hover:shadow-md',
+        'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600',
+        'active:shadow-sm',
+        'disabled:opacity-60 disabled:cursor-not-allowed',
+        'dark:border-gray-300',
+      ].join(' ')}
     >
       <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
-        <path fill="#EA4335" d="M24 9.5c3.8 0 7.3 1.3 10 3.9l6.7-6.7C35.9 2.7 30.3 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.9 6.1C12.2 13.4 17.6 9.5 24 9.5z"/>
-        <path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-2.8-.4-4H24v7.6h12.4c-.6 3.1-2.5 5.7-5.3 7.5l8.1 6.3c4.7-4.4 6.9-10.9 6.9-17.4z"/>
-        <path fill="#FBBC05" d="M10.6 28.4c-.5-1.3-.7-2.8-.7-4.4s.3-3.1.7-4.4l-7.9-6.1C.9 16.6 0 20.2 0 24s.9 7.4 2.7 10.5l7.9-6.1z"/>
-        <path fill="#34A853" d="M24 48c6.4 0 11.9-2.1 15.8-5.8l-8.1-6.3c-2.2 1.5-5 2.3-7.7 2.3-6.4 0-11.8-3.9-13.4-9.5l-7.9 6.1C6.6 42.6 14.6 48 24 48z"/>
-        <path fill="none" d="M0 0h48v48H0z"/>
+        <path
+          fill="#EA4335"
+          d="M24 9.5c3.8 0 7.3 1.3 10 3.9l6.7-6.7C35.9 2.7 30.3 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.9 6.1C12.2 13.4 17.6 9.5 24 9.5z"
+        />
+        <path
+          fill="#4285F4"
+          d="M46.1 24.5c0-1.6-.1-2.8-.4-4H24v7.6h12.4c-.6 3.1-2.5 5.7-5.3 7.5l8.1 6.3c4.7-4.4 6.9-10.9 6.9-17.4z"
+        />
+        <path
+          fill="#FBBC05"
+          d="M10.6 28.4c-.5-1.3-.7-2.8-.7-4.4s.3-3.1.7-4.4l-7.9-6.1C.9 16.6 0 20.2 0 24s.9 7.4 2.7 10.5l7.9-6.1z"
+        />
+        <path
+          fill="#34A853"
+          d="M24 48c6.4 0 11.9-2.1 15.8-5.8l-8.1-6.3c-2.2 1.5-5 2.3-7.7 2.3-6.4 0-11.8-3.9-13.4-9.5l-7.9 6.1C6.6 42.6 14.6 48 24 48z"
+        />
+        <path fill="none" d="M0 0h48v48H0z" />
       </svg>
 
       {loading ? (
         <span className="inline-flex items-center gap-2">
           <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+              fill="none"
+            />
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+            />
           </svg>
           Signing in…
         </span>
@@ -101,11 +142,14 @@ function GoogleButtonInner({ autoStart }: { autoStart?: boolean }) {
 export default function LoginWithGoogle() {
   const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
 
-  // ✅ ยังแสดงปุ่มได้ แต่ไม่ mount reCAPTCHA จนกว่าจะคลิก
+  // ✅ ยังไม่ mount provider จนกว่าจะ “คลิก”
   const [enableRecaptcha, setEnableRecaptcha] = useState(false);
 
+  // กันเคส user คลิกแล้ว แต่ executeRecaptcha ยังไม่ ready
+  const [autoStart, setAutoStart] = useState(false);
+
   if (!siteKey) {
-    // ถ้าไม่มี key ให้แสดงปุ่ม Google แบบไม่ใช้ reCAPTCHA (หรือจะ alert ก็ได้)
+    // ไม่มี key ก็ยัง login ได้ แค่ไม่ส่ง recaptchaToken
     return <GoogleButtonInner />;
   }
 
@@ -114,35 +158,58 @@ export default function LoginWithGoogle() {
       <button
         type="button"
         aria-label="Sign in with Google"
-        onClick={() => setEnableRecaptcha(true)}
+        onClick={() => {
+          setEnableRecaptcha(true);
+          setAutoStart(true); // ✅ ให้เริ่ม flow ทันทีหลัง provider พร้อม
+        }}
         className={[
-          "w-full inline-flex items-center justify-center gap-3 px-4 py-3 rounded-xl",
-          "bg-white text-gray-800 font-medium border border-gray-200 shadow-sm",
-          "hover:bg-gray-50 hover:shadow-md",
-          "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600",
-          "active:shadow-sm",
-          "dark:border-gray-300"
-        ].join(" ")}
+          'w-full inline-flex items-center justify-center gap-3 px-4 py-3 rounded-xl',
+          'bg-white text-gray-800 font-medium border border-gray-200 shadow-sm',
+          'hover:bg-gray-50 hover:shadow-md',
+          'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600',
+          'active:shadow-sm',
+          'dark:border-gray-300',
+        ].join(' ')}
       >
         <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
-          <path fill="#EA4335" d="M24 9.5c3.8 0 7.3 1.3 10 3.9l6.7-6.7C35.9 2.7 30.3 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.9 6.1C12.2 13.4 17.6 9.5 24 9.5z"/>
-          <path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-2.8-.4-4H24v7.6h12.4c-.6 3.1-2.5 5.7-5.3 7.5l8.1 6.3c4.7-4.4 6.9-10.9 6.9-17.4z"/>
-          <path fill="#FBBC05" d="M10.6 28.4c-.5-1.3-.7-2.8-.7-4.4s.3-3.1.7-4.4l-7.9-6.1C.9 16.6 0 20.2 0 24s.9 7.4 2.7 10.5l7.9-6.1z"/>
-          <path fill="#34A853" d="M24 48c6.4 0 11.9-2.1 15.8-5.8l-8.1-6.3c-2.2 1.5-5 2.3-7.7 2.3-6.4 0-11.8-3.9-13.4-9.5l-7.9 6.1C6.6 42.6 14.6 48 24 48z"/>
-          <path fill="none" d="M0 0h48v48H0z"/>
+          <path
+            fill="#EA4335"
+            d="M24 9.5c3.8 0 7.3 1.3 10 3.9l6.7-6.7C35.9 2.7 30.3 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.9 6.1C12.2 13.4 17.6 9.5 24 9.5z"
+          />
+          <path
+            fill="#4285F4"
+            d="M46.1 24.5c0-1.6-.1-2.8-.4-4H24v7.6h12.4c-.6 3.1-2.5 5.7-5.3 7.5l8.1 6.3c4.7-4.4 6.9-10.9 6.9-17.4z"
+          />
+          <path
+            fill="#FBBC05"
+            d="M10.6 28.4c-.5-1.3-.7-2.8-.7-4.4s.3-3.1.7-4.4l-7.9-6.1C.9 16.6 0 20.2 0 24s.9 7.4 2.7 10.5l7.9-6.1z"
+          />
+          <path
+            fill="#34A853"
+            d="M24 48c6.4 0 11.9-2.1 15.8-5.8l-8.1-6.3c-2.2 1.5-5 2.3-7.7 2.3-6.4 0-11.8-3.9-13.4-9.5l-7.9 6.1C6.6 42.6 14.6 48 24 48z"
+          />
+          <path fill="none" d="M0 0h48v48H0z" />
         </svg>
         <span>Sign in with Google</span>
       </button>
     );
   }
 
-  // ✅ mount provider หลังคลิกเท่านั้น → ไม่เด้ง PAT 401 ตอนเข้า page
   return (
     <GoogleReCaptchaProvider
       reCaptchaKey={siteKey}
-      scriptProps={{ async: true, defer: true }}
+      scriptProps={{
+        async: true,
+        defer: true,
+        // ✅ ใส่ nonce ไม่จำเป็น แต่ปล่อยไว้ก็ได้
+      }}
     >
-      <GoogleButtonInner autoStart />
+      <GoogleButtonInner
+        autoStart={autoStart}
+        onReady={() => {
+          // ✅ ถ้า provider ready แล้ว ก็ถือว่า autoStart ใช้ได้
+        }}
+      />
     </GoogleReCaptchaProvider>
   );
 }

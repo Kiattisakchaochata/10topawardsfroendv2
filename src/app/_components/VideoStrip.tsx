@@ -159,66 +159,132 @@ export default function VideoStrip({
     return () => cancelAnimationFrame(raf);
   }, [base.length, cardWidth, gap, speedSec, active, half]);
 
-  /** Drag */
-  useEffect(() => {
-    if (openVideo) return;
+  /** Drag (mobile-safe: vertical scroll always works) */
+useEffect(() => {
+  if (openVideo) return;
 
-    const track = trackRef.current;
-    const wrap = wrapRef.current;
-    if (!track || !wrap) return;
-    const CLICK_DRAG_THRESHOLD = 8;
+  const track = trackRef.current;
+  const wrap = wrapRef.current;
+  if (!track || !wrap) return;
 
-    let startX = 0;
-    let startPos = 0;
-    let moved = 0;
+  const CLICK_DRAG_THRESHOLD = 8;
 
-    const normalize = (x: number) => {
-      let nx = x;
-      while (nx <= -half) nx += half;
-      while (nx > 0) nx -= half;
-      return nx;
-    };
+  let startX = 0;
+  let startY = 0;
+  let startPos = 0;
+  let moved = 0;
 
-    const onPointerDown = (e: PointerEvent) => {
+  const normalize = (x: number) => {
+    let nx = x;
+    while (nx <= -half) nx += half;
+    while (nx > 0) nx -= half;
+    return nx;
+  };
+
+  // ---- TOUCH (mobile) ----
+  const onTouchStart = (e: TouchEvent) => {
+    if (!e.touches || !e.touches[0]) return;
+
+    dragActiveRef.current = false; // ยังไม่เริ่มเลื่อนแถบ
+    hoverRef.current = true;
+
+    moved = 0;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    startPos = xRef.current;
+  };
+
+  const onTouchMove = (e: TouchEvent) => {
+    if (!e.touches || !e.touches[0]) return;
+
+    const dx = e.touches[0].clientX - startX;
+    const dy = e.touches[0].clientY - startY;
+
+    // ✅ ถ้าลากขึ้น/ลง → ปล่อยให้หน้า scroll ได้
+    if (!dragActiveRef.current) {
+      if (Math.abs(dy) >= Math.abs(dx)) return;
+
+      // ✅ ถ้าลากซ้าย/ขวาจริง (เกิน threshold) → เริ่มเลื่อนแถบ
+      if (Math.abs(dx) < 8) return;
       dragActiveRef.current = true;
-      hoverRef.current = true;
-      moved = 0;
-      startX = e.clientX;
-      startPos = xRef.current;
-      (e.target as Element).setPointerCapture?.(e.pointerId);
-    };
+    }
 
-    const onPointerMove = (e: PointerEvent) => {
-      if (!dragActiveRef.current) return;
-      const dx = e.clientX - startX;
-      moved = Math.max(moved, Math.abs(dx));
-      xRef.current = normalize(startPos + dx);
-      track.style.transform = `translate3d(${xRef.current}px,0,0)`;
-    };
+    // ✅ กัน default เฉพาะตอน “เลื่อนแนวนอนจริง”
+    e.preventDefault();
 
-    const endDrag = (e?: PointerEvent) => {
-      if (!dragActiveRef.current) return;
+    moved = Math.max(moved, Math.abs(dx));
+    xRef.current = normalize(startPos + dx);
+    track.style.transform = `translate3d(${xRef.current}px,0,0)`;
+  };
+
+  const onTouchEnd = () => {
+    if (dragActiveRef.current) {
       dragActiveRef.current = false;
       hoverRef.current = false;
+
       if (moved > CLICK_DRAG_THRESHOLD) {
         justDraggedRef.current = true;
         setTimeout(() => (justDraggedRef.current = false), 120);
       }
-      if (e) (e.target as Element).releasePointerCapture?.(e.pointerId);
-    };
+    } else {
+      hoverRef.current = false;
+    }
+  };
 
-    wrap.addEventListener("pointerdown", onPointerDown);
-    window.addEventListener("pointermove", onPointerMove);
-    window.addEventListener("pointerup", endDrag);
-    window.addEventListener("pointercancel", endDrag);
+  // ---- MOUSE (desktop) ----
+  let mouseDown = false;
 
-    return () => {
-      wrap.removeEventListener("pointerdown", onPointerDown);
-      window.removeEventListener("pointermove", onPointerMove);
-      window.removeEventListener("pointerup", endDrag);
-      window.removeEventListener("pointercancel", endDrag);
-    };
-  }, [half, openVideo]);
+  const onMouseDown = (e: MouseEvent) => {
+    mouseDown = true;
+    dragActiveRef.current = true;
+    hoverRef.current = true;
+    moved = 0;
+    startX = e.clientX;
+    startPos = xRef.current;
+  };
+
+  const onMouseMove = (e: MouseEvent) => {
+    if (!mouseDown) return;
+    const dx = e.clientX - startX;
+    moved = Math.max(moved, Math.abs(dx));
+    xRef.current = normalize(startPos + dx);
+    track.style.transform = `translate3d(${xRef.current}px,0,0)`;
+  };
+
+  const onMouseUp = () => {
+    if (!mouseDown) return;
+    mouseDown = false;
+    dragActiveRef.current = false;
+    hoverRef.current = false;
+
+    if (moved > CLICK_DRAG_THRESHOLD) {
+      justDraggedRef.current = true;
+      setTimeout(() => (justDraggedRef.current = false), 120);
+    }
+  };
+
+  // ✅ touchmove ต้อง passive: false เพื่อให้ preventDefault ทำงาน
+  wrap.addEventListener("touchstart", onTouchStart, { passive: true });
+  wrap.addEventListener("touchmove", onTouchMove, { passive: false });
+  wrap.addEventListener("touchend", onTouchEnd, { passive: true });
+  wrap.addEventListener("touchcancel", onTouchEnd, { passive: true });
+
+  // desktop mouse
+  wrap.addEventListener("mousedown", onMouseDown);
+  window.addEventListener("mousemove", onMouseMove);
+  window.addEventListener("mouseup", onMouseUp);
+
+  return () => {
+    wrap.removeEventListener("touchstart", onTouchStart as any);
+    wrap.removeEventListener("touchmove", onTouchMove as any);
+    wrap.removeEventListener("touchend", onTouchEnd as any);
+    wrap.removeEventListener("touchcancel", onTouchEnd as any);
+
+    wrap.removeEventListener("mousedown", onMouseDown as any);
+    window.removeEventListener("mousemove", onMouseMove as any);
+    window.removeEventListener("mouseup", onMouseUp as any);
+  };
+}, [half, openVideo]);
 
   /** Wheel */
   useEffect(() => {
@@ -282,9 +348,8 @@ export default function VideoStrip({
   return (
     <div
   ref={wrapRef}
-  className="relative mt-12 overflow-hidden rounded-2xl select-none
-             touch-pan-y overscroll-y-contain"  /* ✅ เพิ่มสองคลาสนี้ */
-  style={{ touchAction: "pan-y", WebkitOverflowScrolling: "touch" }} /* ✅ เปลี่ยนจาก none */
+  className="relative mt-12 overflow-hidden rounded-2xl select-none touch-pan-y overscroll-y-contain"
+  style={{ touchAction: "pan-y", WebkitOverflowScrolling: "touch" }}
   onPointerEnter={() => (hoverRef.current = true)}
   onPointerLeave={() => (hoverRef.current = false)}
 >
