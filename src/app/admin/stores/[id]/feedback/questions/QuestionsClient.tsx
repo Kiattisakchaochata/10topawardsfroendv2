@@ -90,8 +90,20 @@ export default function QuestionsClient({
       const r = await api<{ data: StoreFeedbackQuestion[] }>(
         `/api/admin/stores/${storeId}/feedback/questions`
       );
-      const arr = Array.isArray(r?.data) ? r.data : [];
-      setItems(arr.sort(sortByOrder));
+      const arrRaw = Array.isArray(r?.data) ? (r.data as any[]) : [];
+
+const arr: StoreFeedbackQuestion[] = arrRaw.map((q: any) => ({
+  id: q.id,
+  storeId: q.storeId ?? q.store_id,
+  title: q.title ?? q.question ?? q.text ?? q.label ?? "",
+  type: q.type,
+  isActive: q.isActive ?? q.is_active ?? true,
+  order: q.order ?? q.order_number ?? 0,
+  createdAt: q.createdAt ?? q.created_at,
+  updatedAt: q.updatedAt ?? q.updated_at,
+}));
+
+setItems(arr.sort(sortByOrder));
     } catch (e: any) {
       setErr(e?.message || "refresh failed");
     } finally {
@@ -351,7 +363,7 @@ export default function QuestionsClient({
                     <td className="py-3 pr-3 font-mono text-gray-200">{it.order}</td>
 
                     <td className="py-3 pr-3">
-                      <div className="font-medium text-white">{it.title}</div>
+                      <div className="font-medium text-white">{it.title || "-"}</div>
                       <div className="mt-0.5 text-xs text-gray-400 font-mono">{it.id}</div>
                     </td>
 

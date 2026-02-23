@@ -86,9 +86,9 @@ export default function FeedbackPageClient({ slug }: Props) {
         setErrorMsg(null);
 
         const res = await fetch(
-          `${API_BASE}/api/public/stores/${encodeURIComponent(slug)}/feedback/questions`,
-          { cache: "no-store" }
-        );
+  `/api/public/stores/${encodeURIComponent(slug)}/feedback/questions`,
+  { cache: "no-store" }
+);
 
         const json = (await res.json().catch(() => ({}))) as ApiQuestions;
 
@@ -155,27 +155,31 @@ export default function FeedbackPageClient({ slug }: Props) {
     setErrorMsg(null);
 
     try {
-      // payload แบบใหม่ตาม controller: answers[{ key, value_number/value_text }]
-      const payload = {
-        comment: comment.trim() || null,
-        answers: questions.map((q) => {
-          const a = answers[q.key] || { number: "", text: "" };
+      // ✅ payload ใหม่: ส่ง comment เฉพาะตอนมีข้อความจริง ๆ
+const payload: any = {
+  answers: questions.map((q) => {
+    const a = answers[q.key] || { number: "", text: "" };
 
-          if (q.type === "TEXT") {
-            return { key: q.key, value_text: a.text.trim() };
-          }
-          return { key: q.key, value_number: Number(a.number) };
-        }),
-      };
+    if (q.type === "TEXT") {
+      return { key: q.key, value_text: a.text.trim() };
+    }
+    return { key: q.key, value_number: Number(a.number) };
+  }),
+};
 
-      const res = await fetch(
-        `${API_BASE}/api/public/stores/${encodeURIComponent(slug)}/feedback`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        }
-      );
+// ✅ ใส่ comment เฉพาะถ้ามีค่า (ไม่ส่ง comment: null / comment: "")
+const c = comment.trim();
+if (c) payload.comment = c;
+
+// ✅ ยิง endpoint ใหม่ /feedback/submit
+const res = await fetch(
+  `/api/public/stores/${encodeURIComponent(slug)}/feedback/submit`,
+  {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  }
+);
 
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.message || "ส่งข้อมูลไม่สำเร็จ");
