@@ -359,7 +359,9 @@ async function getVideos(take = 12): Promise<Video[]> {
     const data = await res.json();
     const list: any[] = Array.isArray(data) ? data : data?.videos || [];
 
-    return (list || []).filter((v) => v?.id && (v.youtube_url || v.tiktok_url));
+    return (list || []).filter(
+  (v) => v?.id && (v.youtube_url || v.tiktok_url || v.thumbnail_url)
+);
   } catch {
     return [];
   }
