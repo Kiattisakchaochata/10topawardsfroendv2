@@ -2,7 +2,7 @@
 import React from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { safeUrl } from "@/lib/safeUrl";
 import Navbar from "@/components/Navbar";
 import BannerCarousel from "./_components/BannerCarousel";
@@ -79,6 +79,13 @@ const AUTH_COOKIE =
   process.env.NEXT_PUBLIC_AUTH_COOKIE ||
   "token";
 
+async function getBaseUrl() {
+  const h = await headers(); // ✅ ต้อง await
+  const proto = h.get("x-forwarded-proto") ?? "http";
+  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
+  return `${proto}://${host}`;
+}
+  
 /** ---------- Metadata (SEO สำหรับหน้า Home) ---------- **/
 export async function generateMetadata(): Promise<Metadata> {
   const canonical = SITE_URL;
@@ -340,21 +347,19 @@ async function getBanners(): Promise<Banner[]> {
 
 async function getVideos(take = 12): Promise<Video[]> {
   try {
-    const res = await fetch(
-      `${SITE_URL}/api/videos?active=1&take=${take}`,
-      {
-        cache: "no-store",
-        next: { revalidate: 0, tags: ["videos"] },
-        headers: { "Cache-Control": "no-store" },
-      }
-    );
+    const base = await getBaseUrl(); // ✅ ต้อง await
+    const res = await fetch(`${base}/api/videos?active=1&take=${take}`, {
+      cache: "no-store",
+      next: { revalidate: 0, tags: ["videos"] },
+      headers: { "Cache-Control": "no-store" },
+    });
+
     if (!res.ok) return [];
+
     const data = await res.json();
     const list: any[] = Array.isArray(data) ? data : data?.videos || [];
 
-    return (list || []).filter(
-      (v) => v?.id && (v.youtube_url || v.tiktok_url)
-    );
+    return (list || []).filter((v) => v?.id && (v.youtube_url || v.tiktok_url));
   } catch {
     return [];
   }
