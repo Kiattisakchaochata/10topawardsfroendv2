@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { clearAuthCookie, getAuthCookie } from "@/lib/auth";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8899/api";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8900/api";
 const LOGOUT_PATH = process.env.BACKEND_LOGOUT_PATH || "/auth/logout";
 
 export async function POST() {

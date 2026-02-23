@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import { setAuthCookie, AUTH_COOKIE } from "@/lib/auth";
 
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8899/api").replace(/\/$/, "");
+const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8900/api").replace(/\/$/, "");
 const LOGIN_PATH = process.env.BACKEND_LOGIN_PATH || "/auth/login";
 
 /* ----------------------------- helpers ----------------------------- */

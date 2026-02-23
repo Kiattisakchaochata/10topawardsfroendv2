@@ -32,7 +32,7 @@ function getApiBase() {
   const raw =
     process.env.NEXT_PUBLIC_API_BASE ||
     process.env.NEXT_PUBLIC_API_URL ||
-    "http://localhost:8899";
+    "http://localhost:8900";
 
   // ตัดท้าย "/api" ถ้ามี แล้วตัด "/" ท้ายสุด
   return raw.replace(/\/api\/?$/, "").replace(/\/$/, "");

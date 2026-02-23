@@ -5,7 +5,7 @@ import { revalidateTag, revalidatePath } from "next/cache";
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 
-const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8899/api").replace(/\/$/, "");
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8900/api").replace(/\/$/, "");
 const AUTH_COOKIE =
   process.env.AUTH_COOKIE_NAME ||
   process.env.NEXT_PUBLIC_AUTH_COOKIE ||

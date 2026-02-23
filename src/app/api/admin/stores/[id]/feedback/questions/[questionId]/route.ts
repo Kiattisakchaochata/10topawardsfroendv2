@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-const BACKEND = process.env.BACKEND_URL || "http://localhost:8899";
+const BACKEND = process.env.BACKEND_URL || "http://localhost:8900";
 
 function getToken(req: Request) {
   const cookie = req.headers.get("cookie") || "";

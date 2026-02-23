@@ -20,7 +20,7 @@ const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || "";
 const API_BASE = (
   process.env.NEXT_PUBLIC_API_BASE ||
   process.env.NEXT_PUBLIC_API_URL ||
-  "http://localhost:8899"
+  "http://localhost:8900"
 )
   .replace(/\/$/, "")
   .replace(/\/api$/, ""); // ✅ กัน /api ซ้อน
