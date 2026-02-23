@@ -171,9 +171,9 @@ const payload: any = {
 const c = comment.trim();
 if (c) payload.comment = c;
 
-// ✅ ยิง endpoint ใหม่ /feedback/submit
+// ✅ ยิง endpoint ที่ backend v2 มีจริง: POST /api/public/stores/:slug/feedback
 const res = await fetch(
-  `/api/public/stores/${encodeURIComponent(slug)}/feedback/submit`,
+  `/api/public/stores/${encodeURIComponent(slug)}/feedback`,
   {
     method: "POST",
     headers: { "Content-Type": "application/json" },
