@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 const API_BASE =
-  (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8899/api").replace(/\/$/, "");
+  (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8900/api").replace(/\/$/, "");
 
 type Store = {
   id: string;

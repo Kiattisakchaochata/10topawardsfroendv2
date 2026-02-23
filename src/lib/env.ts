@@ -1,7 +1,7 @@
 const isProd = process.env.NODE_ENV === "production";
 
 const PROD_SITE = "https://www.10topawards.com";
-const DEV_API = "http://localhost:8899";
+const DEV_API = "http://localhost:8900";
 
 export const SITE_URL =
   (process.env.NEXT_PUBLIC_SITE_URL || (isProd ? PROD_SITE : "http://localhost:3000"))

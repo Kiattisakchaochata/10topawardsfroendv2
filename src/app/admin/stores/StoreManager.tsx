@@ -14,7 +14,7 @@ import { createPortal } from "react-dom";
 import { normalizeGoogleEmbed, extractIframeSrc } from "@/lib/googleMap";
 import Link from "next/link";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8899/api";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8900/api";
 
 type Category = { id: string; name: string };
 type StoreImage = { id: string; image_url: string; order_number?: number | null };

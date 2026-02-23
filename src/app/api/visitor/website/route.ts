@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-const API = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8899/api").replace(/\/$/, "");
+const API = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8900/api").replace(/\/$/, "");
 
 // ไม่ต้อง cache, ไม่ต้อง credentials
 export async function POST() {

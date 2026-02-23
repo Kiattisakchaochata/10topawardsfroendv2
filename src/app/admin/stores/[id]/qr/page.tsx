@@ -8,7 +8,7 @@ import PrintQRSheetButton from "@/components/admin/PrintQRSheetButton";
 export const dynamic = "force-dynamic";
 
 const API_URL = (
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8899/api"
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8900/api"
 ).replace(/\/$/, "");
 const AUTH_COOKIE =
   process.env.AUTH_COOKIE_NAME ||

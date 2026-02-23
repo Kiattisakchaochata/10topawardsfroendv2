@@ -2,7 +2,7 @@
 'use client';
 
 export const apiBase =
-  (process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8899/api')
+  (process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8900/api')
     .replace(/\/$/, '');
 
 /* ---------- Helpers ---------- */

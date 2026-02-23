@@ -24,7 +24,7 @@ type Store = {
 const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 const API_URL = (
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8899/api"
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8900/api"
 ).replace(/\/$/, "");
 
 const NO_IMAGE =

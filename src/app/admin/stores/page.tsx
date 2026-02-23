@@ -5,7 +5,7 @@ import ExpiryPanel from "./components/ExpiryPanel";
 import { FeedbackQuestionsPanel } from "@/components/admin/StoreFeedbackPanel";
 export const dynamic = "force-dynamic";
 
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8899/api").replace(
+const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8900/api").replace(
   /\/$/,
   ""
 );

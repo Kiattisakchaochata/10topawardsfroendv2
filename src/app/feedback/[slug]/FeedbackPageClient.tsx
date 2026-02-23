@@ -28,7 +28,7 @@ const API_BASE = (
   process.env.NEXT_PUBLIC_API_BASE_URL ||
   process.env.NEXT_PUBLIC_API_BASE ||
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/api$/, "") ||
-  "http://localhost:8899"
+  "http://localhost:8900"
 ).replace(/\/$/, "");
 
 // -------- UI helpers --------

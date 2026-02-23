@@ -50,7 +50,7 @@ function AlertModal({
 
 
 /** Normalize base URL */
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8899/api").replace(/\/$/, "");
+const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8900/api").replace(/\/$/, "");
 // --- Icon Button base (match videos page) ---
 const iconCircleBase =
   "cursor-pointer select-none inline-flex items-center justify-center " +

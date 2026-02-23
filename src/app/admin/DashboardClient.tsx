@@ -4,7 +4,7 @@
 import { useMemo, useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 const API_BASE =
-  (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8899/api").replace(/\/$/, "");
+  (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8900/api").replace(/\/$/, "");
 
 type Summary = { users: number; categories: number; stores: number; visitors: number };
 

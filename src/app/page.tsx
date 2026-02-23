@@ -68,7 +68,7 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
 // ตั้ง API_ORIGIN เป็นโดเมนล้วน (ไม่มี /api)
 const API_ORIGIN = (
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8899"
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8900"
 ).replace(/\/$/, "").replace(/\/api$/, "");
 
 // ต่อ /api ทีเดียว

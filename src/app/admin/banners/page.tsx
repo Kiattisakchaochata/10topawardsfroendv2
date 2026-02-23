@@ -13,7 +13,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useConfirm } from "@/hooks/useConfirm";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8899/api";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8900/api";
 const FILE_FIELD = process.env.NEXT_PUBLIC_BANNER_FILE_FIELD || "image";
 const LAST_FIT_KEY = "bannerPreviewFit"; // 'contain' | 'cover'
 /* ===== Premium theme (match Categories page) ===== */

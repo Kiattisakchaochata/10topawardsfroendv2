@@ -7,7 +7,7 @@ const AUTH_COOKIE =
   process.env.NEXT_PUBLIC_AUTH_COOKIE ||
   "token";
 
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8899/api").replace(/\/$/, "");
+const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8900/api").replace(/\/$/, "");
 
 async function doBackendLogout() {
   try {

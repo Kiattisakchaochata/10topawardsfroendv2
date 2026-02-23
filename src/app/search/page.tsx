@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { Suggestions, RefocusSearchButton } from "./SearchClientBits";
 
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8899/api").replace(/\/$/, "");
+const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8900/api").replace(/\/$/, "");
 
 type Category = { id: string; name: string };
 type Store = {

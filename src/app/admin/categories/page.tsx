@@ -15,7 +15,7 @@ const THEME = {
   accent: "bg-gradient-to-r from-[#FFD700] to-[#B8860B] bg-clip-text text-transparent",
 };
 
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8899/api").replace(/\/$/, "");
+const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8900/api").replace(/\/$/, "");
 const AUTH_COOKIE =
   process.env.AUTH_COOKIE_NAME || process.env.NEXT_PUBLIC_AUTH_COOKIE || "token";
 

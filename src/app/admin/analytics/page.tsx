@@ -5,7 +5,7 @@ import DashboardClient from "../DashboardClient";
 export const dynamic = "force-dynamic";
 
 const API_URL =
-  (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8899/api").replace(/\/$/, "");
+  (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8900/api").replace(/\/$/, "");
 const AUTH_COOKIE =
   process.env.AUTH_COOKIE_NAME ||
   process.env.NEXT_PUBLIC_AUTH_COOKIE ||

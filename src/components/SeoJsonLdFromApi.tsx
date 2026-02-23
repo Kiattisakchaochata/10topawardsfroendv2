@@ -16,13 +16,13 @@ function getApiBase() {
   const raw =
     process.env.NEXT_PUBLIC_API_BASE ||
     process.env.NEXT_PUBLIC_API_URL ||
-    'http://localhost:8899';
+    'http://localhost:8900';
 
   // ตัด /api ทิ้งถ้ามี แล้วตัด / ท้ายสุดอีกที
   return raw.replace(/\/api\/?$/, '').replace(/\/$/, '');
 }
 
-const API_BASE = getApiBase(); // เช่น http://localhost:8899
+const API_BASE = getApiBase(); // เช่น http://localhost:8900
 
 function normPath(p?: string) {
   if (!p) return '/';

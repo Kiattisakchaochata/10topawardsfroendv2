@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const RAW_API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8899/api";
+const RAW_API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8900/api";
 const API = RAW_API.replace(/\/$/, "");
 const AUTH_COOKIE =
   process.env.AUTH_COOKIE_NAME ||
