@@ -1,25 +1,31 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 export default function LogoutButton({
   className = "ml-4 rounded-lg bg-[#8b4c00] px-4 py-2 text-white text-[15px] font-semibold shadow hover:bg-[#733e00] transition",
   children = "ออกจากระบบ",
 }: { className?: string; children?: React.ReactNode }) {
-  const router = useRouter();
   const [loading, setLoading] = useState(false);
 
   const onLogout = async () => {
     try {
       setLoading(true);
-      // เรียก internal route (รองรับ GET หรือ POST ก็ได้)
-      await fetch("/logout", { method: "POST", credentials: "include" });
-      // ให้แน่ใจว่า state/route รีเฟรช
-      router.replace("/");
-      router.refresh();
+
+      await fetch("/logout", {
+        method: "POST",
+        credentials: "include",
+        cache: "no-store",
+      });
+    } catch (err) {
+      console.error("logout failed:", err);
     } finally {
-      setLoading(false);
+      try {
+        localStorage.removeItem("token");
+      } catch {}
+
+      // บังคับโหลดหน้าใหม่จริง แก้อาการ state ค้างหลัง logout
+      window.location.href = "/";
     }
   };
 

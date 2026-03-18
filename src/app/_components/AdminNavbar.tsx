@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 // ✅ เพิ่มเมนู Tracking เข้าใน NAV
@@ -12,13 +12,13 @@ const NAV = [
   { href: "/admin/banners", label: "Banners" },
   { href: "/admin/videos", label: "Videos" },
   { href: "/admin/seo", label: "Admin SEO" },
-  { href: "/admin/tracking", label: "Tracking" }, // ✅ เมนูใหม่
+  { href: "/admin/tracking", label: "Tracking" },
 ];
 
 export default function AdminNavbar() {
   const pathname = usePathname();
-  const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   // ปิดเมนูมือถือเวลาเปลี่ยนหน้า
   useEffect(() => {
@@ -33,12 +33,22 @@ export default function AdminNavbar() {
 
   async function handleLogout() {
     try {
-      await fetch("/logout", { method: "POST", credentials: "include" });
+      setLoggingOut(true);
+
+      await fetch("/logout", {
+        method: "POST",
+        credentials: "include",
+        cache: "no-store",
+      });
     } catch (e) {
-      console.error(e);
+      console.error("logout failed:", e);
     } finally {
-      router.replace("/");
-      router.refresh();
+      try {
+        localStorage.removeItem("token");
+      } catch {}
+
+      // ✅ บังคับโหลดหน้าใหม่จริง แก้อาการ logout แล้วข้อมูลหน้าแรกค้าง
+      window.location.href = "/";
     }
   }
 
@@ -69,11 +79,13 @@ export default function AdminNavbar() {
                 </li>
               ))}
             </ul>
+
             <button
               onClick={handleLogout}
-              className="ml-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+              disabled={loggingOut}
+              className="ml-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              ออกจากระบบ
+              {loggingOut ? "กำลังออก..." : "ออกจากระบบ"}
             </button>
           </div>
 
@@ -106,12 +118,14 @@ export default function AdminNavbar() {
                   </Link>
                 </li>
               ))}
+
               <li className="px-1">
                 <button
                   onClick={handleLogout}
-                  className="w-full rounded-lg bg-red-600 px-3 py-2 text-base font-medium text-white hover:bg-red-700"
+                  disabled={loggingOut}
+                  className="w-full rounded-lg bg-red-600 px-3 py-2 text-base font-medium text-white hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  ออกจากระบบ
+                  {loggingOut ? "กำลังออก..." : "ออกจากระบบ"}
                 </button>
               </li>
             </ul>
